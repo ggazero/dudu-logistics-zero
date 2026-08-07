@@ -94,8 +94,11 @@
     const navEl = document.getElementById('mainNav');
     let html = '';
 
-    if (path === '/' || path === '/shipments/new' || path.startsWith('/shipments/reserved')) {
+    if (path === '/' || path === '/shipments/new') {
       html = '<a href="#/" data-route="/" class="active">새 접수</a>';
+    } else if (path === '/shipments/new/form' || path.startsWith('/shipments/reserved')) {
+      html = `<span style="color:#667085;font-size:13px;">📝 접수 진행중</span>
+              <a href="#/" data-route="/" style="margin-left:auto;">← 돌아가기</a>`;
     } else if (path.startsWith('/admin')) {
       html = `<a href="#/admin" data-route="/admin" class="active">대시보드</a>
               <a href="#/admin/shipments" data-route="/admin/shipments">접수 목록</a>
@@ -667,6 +670,36 @@
     form.addEventListener('change', updatePreview);
     form.addEventListener('reset', () => setTimeout(updatePreview));
     form.addEventListener('submit', submitShipment);
+
+    // Auto-focus next field on tab/enter
+    const formInputs = form.querySelectorAll('input, select, textarea');
+    formInputs.forEach((input, index) => {
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === 'Tab') {
+          e.preventDefault();
+          const next = formInputs[index + 1];
+          if (next) next.focus();
+        }
+      });
+    });
+
+    // Auto-scroll to next section when current section is complete
+    const checkSectionComplete = () => {
+      const section1Fields = ['branchCode', 'destination', 'senderName', 'receiverName', 'itemName', 'declaredValue'];
+      const section1Complete = section1Fields.every(id => document.getElementById(id)?.value);
+
+      if (section1Complete) {
+        const section2 = document.querySelector('[style*="section-title"]');
+        if (section2) {
+          const sections = document.querySelectorAll('.form-section');
+          if (sections.length > 1) sections[1].scrollIntoView({ behavior: 'smooth' });
+        }
+      }
+    };
+
+    form.addEventListener('change', checkSectionComplete);
+    form.addEventListener('input', checkSectionComplete);
+
     updatePreview();
   }
 
