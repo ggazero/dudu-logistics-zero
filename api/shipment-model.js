@@ -30,6 +30,13 @@ const RATE_TABLE = Object.freeze([
 ]);
 
 const ETA_BUSINESS_DAYS = Object.freeze({ 일반: 1, 제주: 2, 도서산간: 3 });
+const DELIVERY_SERVICES = Object.freeze({
+  economy: { code: 'economy', name: '일반 알뜰택배', surcharge: 0 },
+  dawn: { code: 'dawn', name: '새벽택배', surcharge: 3000 },
+  same_day: { code: 'same_day', name: '당일택배', surcharge: 5000 },
+});
+const ITEM_CATEGORIES = new Set(['clothing', 'books', 'living', 'electronics', 'food', 'other']);
+const MEASUREMENT_MODES = new Set(['manual', 'auto']);
 const INTAKE_TYPES = new Set(['standard', 'reserved', 'customer', 'member', 'shopping', 'branch']);
 const INTAKE_FIELDS = Object.freeze({
   standard: [],
@@ -119,10 +126,18 @@ export function validateAndNormalizeShipment(payload, now = new Date()) {
   const receiverArea = cleanText(payload.receiver?.area, 20);
   const region = DESTINATIONS[receiverArea];
   const itemName = cleanText(payload.item?.name, 80);
+  const itemCategory = cleanText(payload.item?.category, 20);
   if (!senderName) errors.push('보내는 분 이름이 필요합니다.');
   if (!receiverName) errors.push('받는 분 이름이 필요합니다.');
   if (!region) errors.push('표준 도착 지역을 선택해 주세요.');
   if (!itemName) errors.push('물품명이 필요합니다.');
+  if (!ITEM_CATEGORIES.has(itemCategory)) errors.push('표준 품목 카테고리를 선택해 주세요.');
+
+  const deliveryCode = cleanText(payload.delivery?.code, 20) || 'economy';
+  const delivery = DELIVERY_SERVICES[deliveryCode];
+  if (!delivery) errors.push('지원하는 택배 서비스를 선택해 주세요.');
+  const measurementMode = cleanText(payload.measurementMode, 10) || 'manual';
+  if (!MEASUREMENT_MODES.has(measurementMode)) errors.push('지원하는 무게 측정 방식을 선택해 주세요.');
 
   const declaredValue = nonNegativeNumber(payload.item?.declaredValue);
   if (declaredValue === null || declaredValue > 100_000_000) {
@@ -162,7 +177,9 @@ export function validateAndNormalizeShipment(payload, now = new Date()) {
       calculation = {
         weight: round(weight), width: round(width), height: round(height), depth: round(depth),
         volumeWeight, billedWeight, dimensionSum, grade: rate.grade, region,
-        price: rate.price[region], etaDate: formatDate(addBusinessDays(now, ETA_BUSINESS_DAYS[region])),
+        basePrice: rate.price[region],
+        price: rate.price[region] + (delivery?.surcharge || 0),
+        etaDate: formatDate(addBusinessDays(now, ETA_BUSINESS_DAYS[region])),
       };
     }
   }
@@ -177,6 +194,7 @@ export function validateAndNormalizeShipment(payload, now = new Date()) {
     senderName,
     receiverName,
     itemName,
+    itemCategory,
     declaredValue,
     weight,
     width,
@@ -191,7 +209,9 @@ export function validateAndNormalizeShipment(payload, now = new Date()) {
     branch,
     sender: { name: senderName },
     receiver: { name: receiverName, area: receiverArea, region },
-    item: { name: itemName, declaredValue },
+    item: { name: itemName, category: itemCategory, declaredValue },
+    delivery,
+    measurementMode,
     intake,
     raw: preservedInput,
     calculation,
@@ -229,7 +249,13 @@ export function toDatabaseRecord(record, trackingNo) {
     normalized_region_type: record.calculation.region,
     normalized_status: record.status,
     policy_version: record.policyVersion,
-    raw_input: { intake: record.intake, input: record.raw },
+    raw_input: {
+      intake: record.intake,
+      input: record.raw,
+      itemCategory: record.item.category,
+      delivery: record.delivery,
+      measurementMode: record.measurementMode,
+    },
     review_status: record.review.status,
     review_reason: record.review.reason || null,
   };

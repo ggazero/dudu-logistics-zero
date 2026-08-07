@@ -16,7 +16,9 @@ function validPayload(overrides = {}) {
     branch: { code: '11', name: '변조된 지점명' },
     sender: { name: '김발송' },
     receiver: { name: '이수령', area: '서울', region: '변조된 권역' },
-    item: { name: '의류', declaredValue: 10000 },
+    item: { name: '셔츠', category: 'clothing', declaredValue: 10000 },
+    delivery: { code: 'economy' },
+    measurementMode: 'manual',
     intake: { type: 'customer', details: { customerPhone: '010-1234-5678', ignored: '제외' } },
     raw: { weight: '2', width: '20', height: '20', depth: '20' },
     calculation: { price: 1, grade: '대형', billedWeight: 99 },
@@ -42,6 +44,8 @@ test('접수 유형별 값은 공통 입력과 분리해 DB 원본 JSON에 저�
     details: { customerPhone: '010-1234-5678' },
   });
   assert.equal(dbRecord.raw_input.input.weight, 2);
+  assert.equal(dbRecord.raw_input.itemCategory, 'clothing');
+  assert.equal(dbRecord.raw_input.delivery.code, 'economy');
   assert.equal(dbRecord.raw_input.intake.details.ignored, undefined);
 });
 
@@ -59,12 +63,27 @@ test('미등록 지점과 잘못된 측정값은 서버에서 차단한다', () 
 
 test('금지 품목과 한도 초과 화물은 서버에서 차단한다', () => {
   assert.throws(
-    () => validateAndNormalizeShipment(validPayload({ item: { name: '현금', declaredValue: 1000 } }), NOW),
+    () => validateAndNormalizeShipment(validPayload({ item: { name: '현금', category: 'other', declaredValue: 1000 } }), NOW),
     /금지 품목/,
   );
   assert.throws(
     () => validateAndNormalizeShipment(validPayload({ raw: { weight: 30, width: 20, height: 20, depth: 20 } }), NOW),
     /대형 접수 한도/,
+  );
+});
+
+test('택배 서비스 추가요금과 자동저울 측정 방식을 검증한다', () => {
+  const record = validateAndNormalizeShipment(validPayload({
+    delivery: { code: 'same_day' },
+    measurementMode: 'auto',
+  }), NOW);
+  assert.equal(record.delivery.name, '당일택배');
+  assert.equal(record.calculation.basePrice, 3500);
+  assert.equal(record.calculation.price, 8500);
+  assert.equal(record.measurementMode, 'auto');
+  assert.throws(
+    () => validateAndNormalizeShipment(validPayload({ delivery: { code: 'unknown' } }), NOW),
+    /택배 서비스/,
   );
 });
 

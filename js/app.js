@@ -9,6 +9,9 @@
   let shipments = loadShipments();
   let submitting = false;
   let toastTimer = null;
+  let selectedDeliveryService = 'economy';
+  let selectedItemCategory = '';
+  let measurementMode = 'manual';
 
   function navigate(path, { replace = false } = {}) {
     if (replace) history.replaceState({}, '', path);
@@ -72,6 +75,9 @@
     const intake = rawEnvelope.intake && typeof rawEnvelope.intake === 'object'
       ? rawEnvelope.intake
       : { type: 'standard', details: {} };
+    const delivery = rawEnvelope.delivery && typeof rawEnvelope.delivery === 'object'
+      ? rawEnvelope.delivery
+      : { code: 'economy', name: '일반 알뜰택배', surcharge: 0 };
     const branch = domain.findBranch(row.branch_code || String(row.tracking_no || '').slice(0, 2)) || {
       code: row.branch_code || '', name: row.branch_name || '미등록 지점', hub: '',
     };
@@ -94,8 +100,14 @@
       branch,
       sender: { name: row.sender_name },
       receiver: { name: row.receiver_name, area: destination.name, region: destination.region },
-      item: { name: row.item_name, declaredValue: Number(row.declared_value || 0) },
+      item: {
+        name: row.item_name,
+        category: rawEnvelope.itemCategory || 'other',
+        declaredValue: Number(row.declared_value || 0),
+      },
       intake,
+      delivery,
+      measurementMode: rawEnvelope.measurementMode || 'manual',
       raw,
       calculation: {
         weight: Number(row.weight_kg),
@@ -107,6 +119,7 @@
         dimensionSum: Number(row.dimension_sum_cm || 0),
         grade: row.size_grade,
         region: row.normalized_region_type || row.region_type,
+        basePrice: Math.max(0, Number(row.price || 0) - Number(delivery.surcharge || 0)),
         price: Number(row.price || 0),
         etaDate: row.eta_date,
       },
@@ -182,6 +195,26 @@
     toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
   }
 
+  function rememberCustomerReceipt(trackingNo) {
+    let receipts = [];
+    try {
+      receipts = JSON.parse(sessionStorage.getItem('customer_receipt_ids') || '[]');
+      if (!Array.isArray(receipts)) receipts = [];
+    } catch {
+      receipts = [];
+    }
+    sessionStorage.setItem('customer_receipt_ids', JSON.stringify([...new Set([...receipts, trackingNo])]));
+  }
+
+  function canAccessCustomerReceipt(trackingNo) {
+    try {
+      const receipts = JSON.parse(sessionStorage.getItem('customer_receipt_ids') || '[]');
+      return Array.isArray(receipts) && receipts.includes(trackingNo);
+    } catch {
+      return false;
+    }
+  }
+
   function pageHead(eyebrow, title, description, action = '') {
     return `<div class="page-head">
       <div>
@@ -232,7 +265,9 @@
 
     navEl.innerHTML = html;
     setActiveNav(path);
-    document.querySelector('.header-admin-button')?.classList.toggle('active', path.startsWith('/admin'));
+    const adminButton = document.querySelector('.header-admin-button');
+    adminButton?.classList.toggle('active', path.startsWith('/admin'));
+    if (adminButton) adminButton.hidden = path.startsWith('/shipments/');
   }
 
   function setShipmentProgress(currentStep) {
@@ -255,7 +290,7 @@
     }
 
     const itemDecision = domain.evaluateItem(values.itemName, values.declaredValue);
-    const itemComplete = Boolean(values.itemName)
+    const itemComplete = Boolean(values.itemCategory && values.itemName)
       && itemDecision.outcome !== 'empty'
       && itemDecision.outcome !== 'blocked'
       && !(values.itemName.includes('시계') && values.declaredValue === '');
@@ -293,6 +328,60 @@
       standard: '일반 접수', reserved: '예약택배', customer: '비회원', member: '회원',
       shopping: '쇼핑몰', branch: '점간 택배',
     })[type] || '일반 접수';
+  }
+
+  function deliveryServiceFor(code) {
+    return policy.DELIVERY_SERVICES.find((service) => service.code === code)
+      || policy.DELIVERY_SERVICES[0];
+  }
+
+  function itemCategoryFor(code) {
+    return policy.ITEM_CATEGORIES.find((category) => category.code === code) || null;
+  }
+
+  function itemCategoryLabel(code) {
+    return itemCategoryFor(code)?.name || '직접 입력';
+  }
+
+  function randomTestMeasurement() {
+    return {
+      weight: (0.5 + Math.random() * 9.5).toFixed(2),
+      width: Math.floor(18 + Math.random() * 30),
+      height: Math.floor(12 + Math.random() * 25),
+      depth: Math.floor(10 + Math.random() * 25),
+    };
+  }
+
+  function applyMeasurementMode(mode, onChanged) {
+    measurementMode = mode;
+    const ids = ['weight', 'width', 'height', 'depth'];
+    ids.forEach((id) => {
+      const input = document.getElementById(id);
+      if (input) input.readOnly = mode === 'auto';
+    });
+    document.querySelectorAll('[data-measurement-mode]').forEach((button) => {
+      const active = button.dataset.measurementMode === mode;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+    const scale = document.querySelector('.digital-scale');
+    scale?.classList.toggle('auto-active', mode === 'auto');
+
+    if (mode === 'auto') {
+      const generated = randomTestMeasurement();
+      Object.entries(generated).forEach(([id, value]) => {
+        const input = document.getElementById(id);
+        if (input) input.value = value;
+      });
+      showToast('테스트 자동저울 값이 입력되었습니다.');
+    }
+    onChanged?.();
+  }
+
+  function bindMeasurementControls(onChanged) {
+    document.querySelectorAll('[data-measurement-mode]').forEach((button) => {
+      button.addEventListener('click', () => applyMeasurementMode(button.dataset.measurementMode, onChanged));
+    });
   }
 
   function intakeForForm(type) {
@@ -343,7 +432,7 @@
     text('두두 x CU 택배', 40, 82, 48, 900);
     text('실습용 송장 · 실제 운송용 아님', 40, 125, 22, 600);
     text(`운송장번호  ${trackingNo.slice(0, 4)}-${trackingNo.slice(4, 7)}-${trackingNo.slice(7)}`, 40, 215, 36, 900);
-    text(`${shipment.branch.name}  ${intakeLabel(shipment.intake?.type)}`, 735, 70, 28, 800);
+    text(`${shipment.branch.name}  ${shipment.delivery?.name || '일반 알뜰택배'}`, 735, 70, 28, 800);
     text(`도착  ${shipment.receiver.area}`, 735, 125, 46, 900);
     text(`보내는 사람  ${shipment.sender.name}`, 40, 310, 29, 700);
     text(`받는 사람  ${shipment.receiver.name}`, 40, 360, 29, 700);
@@ -397,7 +486,7 @@
       return '<tr><td colspan="8"><div class="empty-state"><strong>표시할 접수가 없습니다</strong>새 접수를 등록하거나 검색 조건을 바꿔보세요.</div></td></tr>';
     }
     return rows.map((shipment) => `<tr>
-      <td><a class="tracking-link" href="/shipments/${encodeURIComponent(shipment.trackingNo)}">${escapeHtml(shipment.trackingNo)}</a></td>
+      <td><a class="tracking-link" href="/admin/shipments/${encodeURIComponent(shipment.trackingNo)}">${escapeHtml(shipment.trackingNo)}</a></td>
       <td>${escapeHtml(shipment.branch.name)}</td>
       <td>${escapeHtml(shipment.receiver.name)}</td>
       <td>${escapeHtml(shipment.item.name)}</td>
@@ -419,11 +508,12 @@
 
   // Sample reserved booking data (in real app, would come from API/Supabase)
   const mockReservations = {
-    'RES001': { reservationNo: 'RES001', senderName: '김하늘', senderPhone: '010-1234-5678', receiverName: '이준서', receiverArea: '서울', itemName: '이불', width: 60, height: 40, depth: 50, declaredValue: 0 },
-    'RES002': { reservationNo: 'RES002', senderName: '박서연', senderPhone: '010-2345-6789', receiverName: '최민준', receiverArea: '용산', itemName: '책', width: 30, height: 20, depth: 20, declaredValue: 50000 },
+    'RES001': { reservationNo: 'RES001', senderName: '김하늘', senderPhone: '010-1234-5678', receiverName: '이준서', receiverArea: '서울', itemName: '이불', itemCategory: 'living', width: 60, height: 40, depth: 50, declaredValue: 0 },
+    'RES002': { reservationNo: 'RES002', senderName: '박서연', senderPhone: '010-2345-6789', receiverName: '최민준', receiverArea: '용산', itemName: '책', itemCategory: 'books', width: 30, height: 20, depth: 20, declaredValue: 50000 },
   };
 
   function renderReservedIntake() {
+    measurementMode = 'manual';
     app.innerHTML = `${pageHead('Reserved booking', '예약택배 접수', '사전 예약 시 발급받은 예약번호를 입력해주세요. (선택사항)', '<a class="button" href="/">← 돌아가기</a>')}
       <div class="form-layout">
         <form id="reservationForm" class="form-card" novalidate>
@@ -437,16 +527,19 @@
           </section>
           <section class="form-section">
             <div class="section-title"><span>2</span><h2>무게와 크기</h2></div>
-            <div class="form-group">
-              <label for="weight">실제 무게 (kg) <span class="measurement-note">(저울 자동측정)</span> <span style="color:var(--red);">*</span></label>
-              <input type="number" id="weight" placeholder="예: 3" step="0.1" min="0" style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
-            </div>
-            <div class="form-group">
-              <label for="width">가로 × 세로 × 높이 (cm) <span style="color:var(--red);">*</span></label>
-              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
-                <input type="number" id="width" placeholder="가로" min="0" style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
-                <input type="number" id="height" placeholder="세로" min="0" style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
-                <input type="number" id="depth" placeholder="높이" min="0" style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+            <div class="digital-scale compact-scale">
+              <div class="scale-brand"><span>CU AUTO SCALE</span><small>TEST DEVICE</small></div>
+              <div class="scale-mode-buttons">
+                <button type="button" class="scale-mode-button active" data-measurement-mode="manual" aria-pressed="true">수동 입력</button>
+                <button type="button" class="scale-mode-button" data-measurement-mode="auto" aria-pressed="false">자동저울 테스트</button>
+              </div>
+              <div class="scale-display">
+                <div class="field scale-weight"><label for="weight">실제 무게</label><div class="scale-input-wrap"><input type="number" id="weight" placeholder="0.00" step="0.01" min="0"><span>kg</span></div></div>
+                <div class="field scale-dimensions"><label>가로 × 세로 × 높이</label><div class="dimension-grid">
+                  <div class="scale-input-wrap"><input type="number" id="width" placeholder="0" min="0"><span>cm</span></div>
+                  <div class="scale-input-wrap"><input type="number" id="height" placeholder="0" min="0"><span>cm</span></div>
+                  <div class="scale-input-wrap"><input type="number" id="depth" placeholder="0" min="0"><span>cm</span></div>
+                </div></div>
               </div>
             </div>
             <div style="margin-top:12px;padding:12px;border-left:3px solid var(--blue-soft);background:var(--blue-soft);border-radius:4px;font-size:13px;color:#667085;">청구 무게와 요금은 입력하지 않습니다. 실제 무게와 부피 무게 중 큰 값으로 자동 계산합니다.</div>
@@ -457,6 +550,8 @@
         </form>
       </div>
     `;
+
+    bindMeasurementControls();
 
     document.getElementById('reservationForm').addEventListener('submit', (e) => {
       e.preventDefault();
@@ -480,6 +575,7 @@
       sessionStorage.setItem('reserved_width', width);
       sessionStorage.setItem('reserved_height', height);
       sessionStorage.setItem('reserved_depth', depth);
+      sessionStorage.setItem('reserved_measurement_mode', measurementMode);
       navigate(`/shipments/reserved/${encodeURIComponent(resNo)}`);
     });
   }
@@ -727,6 +823,10 @@
     }
 
     const trackingNo = sessionStorage.getItem('reserved_tracking_no') || '';
+    if (!canAccessCustomerReceipt(trackingNo)) {
+      renderNotFound('본인이 방금 접수한 예약택배 내역만 확인할 수 있습니다.');
+      return;
+    }
     const shipment = shipments.find((item) => item.trackingNo === trackingNo);
     if (!shipment) {
       renderNotFound('저장된 예약택배 접수 정보를 찾을 수 없습니다.');
@@ -888,6 +988,10 @@
   }
 
   function renderShipmentComplete(trackingNo) {
+    if (!canAccessCustomerReceipt(trackingNo)) {
+      renderNotFound('본인이 방금 접수한 내역만 확인할 수 있습니다.');
+      return;
+    }
     const shipment = shipments.find((item) => item.trackingNo === trackingNo);
     if (!shipment) {
       renderNotFound('접수 정보를 찾을 수 없습니다.');
@@ -912,6 +1016,7 @@
                 <div>👤 받는 분: ${escapeHtml(shipment.receiver.name)}</div>
                 <div>📍 지역: ${escapeHtml(shipment.receiver.area)}</div>
                 <div>📦 물품: ${escapeHtml(shipment.item.name)}</div>
+                <div>🚚 서비스: ${escapeHtml(shipment.delivery?.name || '일반 알뜰택배')}</div>
                 <div>💰 요금: ${escapeHtml(shipment.calculation.price.toLocaleString())}원</div>
                 <div>📅 도착: ${escapeHtml(shipment.calculation.etaDate)}</div>
               </div>
@@ -927,7 +1032,6 @@
         </article>
         ${completionToolsHtml(shipment, labelDataUrl)}
         <div class="button-row">
-          <a href="/admin/shipments" class="button">접수목록 보기</a>
           <a href="/" class="button primary">홈으로 돌아가기</a>
         </div>
       </div>
@@ -936,6 +1040,9 @@
   }
 
   function renderNewShipment(type) {
+    selectedDeliveryService = 'economy';
+    selectedItemCategory = '';
+    measurementMode = 'manual';
     const intake = intakeForForm(type);
     const customerName = sessionStorage.getItem('customer_name') || '';
     const customerPhone = sessionStorage.getItem('customer_phone') || '';
@@ -982,7 +1089,15 @@
             <div class="section-title"><span>2</span><h2>물품 확인</h2></div>
             <div class="field-grid">
               <div class="field full">
-                <label for="itemName">물품명 <b class="required">*</b></label>
+                <label>품목 카테고리 <b class="required">*</b></label>
+                <div class="category-buttons" role="group" aria-label="품목 카테고리">
+                  ${policy.ITEM_CATEGORIES.map((category) => `<button type="button" class="category-button" data-item-category="${escapeHtml(category.code)}" aria-pressed="false">${escapeHtml(category.name)}</button>`).join('')}
+                </div>
+                <input id="itemCategory" name="itemCategory" type="hidden" value="">
+                <small>해당 카테고리가 없으면 ‘직접 입력’을 선택하고 아래에 물품명을 적어주세요.</small>
+              </div>
+              <div class="field full">
+                <label for="itemName">상세 물품명 <b class="required">*</b></label>
                 <input id="itemName" name="itemName" maxlength="80" placeholder="예: 이불">
                 <small>확실한 금지 품목은 차단하고, 애매한 표현은 운영 확인으로 보냅니다.</small>
               </div>
@@ -996,17 +1111,24 @@
 
           <section class="form-section">
             <div class="section-title"><span>3</span><h2>무게와 크기</h2></div>
-            <div class="field-grid">
-              <div class="field">
-                <label for="weight">실제 무게 (kg) <span class="measurement-note">(저울 자동측정)</span> <b class="required">*</b></label>
-                <input type="number" id="weight" name="weight" min="0.01" step="0.01" placeholder="예: 3">
+            <div class="digital-scale">
+              <div class="scale-brand"><span>CU AUTO SCALE</span><small>TEST DEVICE</small></div>
+              <div class="scale-mode-buttons">
+                <button type="button" class="scale-mode-button active" data-measurement-mode="manual" aria-pressed="true">수동 입력</button>
+                <button type="button" class="scale-mode-button" data-measurement-mode="auto" aria-pressed="false">자동저울 테스트</button>
               </div>
-              <div class="field full">
-                <label>가로 × 세로 × 높이 (cm) <b class="required">*</b></label>
-                <div class="dimension-grid">
-                  <input type="number" id="width" name="width" min="0.1" step="0.1" aria-label="가로" placeholder="가로">
-                  <input type="number" id="height" name="height" min="0.1" step="0.1" aria-label="세로" placeholder="세로">
-                  <input type="number" id="depth" name="depth" min="0.1" step="0.1" aria-label="높이" placeholder="높이">
+              <div class="scale-display">
+                <div class="field scale-weight">
+                  <label for="weight">실제 무게 <b class="required">*</b></label>
+                  <div class="scale-input-wrap"><input type="number" id="weight" name="weight" min="0.01" step="0.01" placeholder="0.00"><span>kg</span></div>
+                </div>
+                <div class="field scale-dimensions">
+                  <label>가로 × 세로 × 높이 <b class="required">*</b></label>
+                  <div class="dimension-grid">
+                    <div class="scale-input-wrap"><input type="number" id="width" name="width" min="0.1" step="0.1" aria-label="가로" placeholder="0"><span>cm</span></div>
+                    <div class="scale-input-wrap"><input type="number" id="height" name="height" min="0.1" step="0.1" aria-label="세로" placeholder="0"><span>cm</span></div>
+                    <div class="scale-input-wrap"><input type="number" id="depth" name="depth" min="0.1" step="0.1" aria-label="높이" placeholder="0"><span>cm</span></div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1033,8 +1155,37 @@
 
     form.addEventListener('input', updatePreview);
     form.addEventListener('change', updatePreview);
-    form.addEventListener('reset', () => setTimeout(updatePreview));
+    form.addEventListener('reset', () => setTimeout(() => {
+      selectedItemCategory = '';
+      selectedDeliveryService = 'economy';
+      applyMeasurementMode('manual', updatePreview);
+      document.querySelectorAll('[data-item-category]').forEach((button) => {
+        button.classList.remove('active');
+        button.setAttribute('aria-pressed', 'false');
+      });
+      updatePreview();
+    }));
     form.addEventListener('submit', submitShipment);
+
+    document.querySelectorAll('[data-item-category]').forEach((button) => {
+      button.addEventListener('click', () => {
+        selectedItemCategory = button.dataset.itemCategory;
+        document.getElementById('itemCategory').value = selectedItemCategory;
+        document.querySelectorAll('[data-item-category]').forEach((item) => {
+          const active = item === button;
+          item.classList.toggle('active', active);
+          item.setAttribute('aria-pressed', String(active));
+        });
+        if (selectedItemCategory === 'other') document.getElementById('itemName').focus();
+        updatePreview();
+      });
+    });
+    document.getElementById('calculationPreview').addEventListener('change', (event) => {
+      if (event.target.name !== 'deliveryService') return;
+      selectedDeliveryService = event.target.value;
+      updatePreview();
+    });
+    bindMeasurementControls(updatePreview);
 
     // Auto-focus next field on tab/enter
     setTimeout(() => {
@@ -1087,11 +1238,14 @@
       senderName: document.getElementById('senderName').value.trim(),
       receiverName: document.getElementById('receiverName').value.trim(),
       itemName: document.getElementById('itemName').value.trim(),
+      itemCategory: selectedItemCategory,
       declaredValue: document.getElementById('declaredValue').value,
       weight: document.getElementById('weight').value,
       width: document.getElementById('width').value,
       height: document.getElementById('height').value,
       depth: document.getElementById('depth').value,
+      deliveryService: selectedDeliveryService,
+      measurementMode,
     };
   }
 
@@ -1104,6 +1258,10 @@
     if (!values.senderName) errors.push('보내는 분 이름을 입력하세요.');
     if (!values.receiverName) errors.push('받는 분 이름을 입력하세요.');
     if (!values.itemName) errors.push('물품명을 입력하세요.');
+    if (!itemCategoryFor(values.itemCategory)) errors.push('품목 카테고리를 선택하세요.');
+    if (!policy.DELIVERY_SERVICES.some((service) => service.code === values.deliveryService)) {
+      errors.push('택배 서비스를 선택하세요.');
+    }
 
     const itemDecision = domain.evaluateItem(values.itemName, values.declaredValue);
     if (itemDecision.outcome === 'blocked') errors.push(itemDecision.reason);
@@ -1119,7 +1277,11 @@
     updateShipmentProgress(values);
     const result = validateForm(values);
     const submitButton = document.getElementById('submitButton');
-    const hasAnyValue = Object.values(values).some(Boolean);
+    const hasAnyValue = [
+      values.branchCode, values.destination, values.senderName, values.receiverName,
+      values.itemName, values.itemCategory, values.declaredValue,
+      values.weight, values.width, values.height, values.depth,
+    ].some(Boolean);
 
     if (!hasAnyValue) {
       preview.innerHTML = '<div class="result-state pending"><strong>입력 대기</strong>필수 정보를 입력하면 금지 품목부터 순서대로 판정합니다.</div>';
@@ -1139,8 +1301,18 @@
         <li><span>5. 크기 등급</span><strong>${escapeHtml(result.calculation.grade)}</strong></li>
         <li><span>6. 배송 권역</span><strong>${escapeHtml(result.calculation.region)}</strong></li>
         <li><span>7. 도착 예정일</span><strong>${escapeHtml(domain.formatDate(eta))}</strong></li>
-      </ul>
-      <div class="price-box"><span>최종 접수 요금</span><strong>${formatWon(result.calculation.price)}</strong></div>`;
+      </ul>`;
+      const serviceOptions = policy.DELIVERY_SERVICES.map((service) => {
+        const totalPrice = result.calculation.price + service.surcharge;
+        return `<label class="service-option ${service.code === selectedDeliveryService ? 'selected' : ''}">
+          <input type="radio" name="deliveryService" value="${escapeHtml(service.code)}" ${service.code === selectedDeliveryService ? 'checked' : ''}>
+          <span><strong>${escapeHtml(service.name)}</strong><small>${escapeHtml(service.description)}</small></span>
+          <b>${formatWon(totalPrice)}</b>
+        </label>`;
+      }).join('');
+      const selectedService = deliveryServiceFor(selectedDeliveryService);
+      html += `<div class="service-selector"><div class="service-selector-title">택배 서비스 선택</div>${serviceOptions}</div>
+      <div class="price-box"><span>${escapeHtml(selectedService.name)} 최종 접수 요금</span><strong>${formatWon(result.calculation.price + selectedService.surcharge)}</strong></div>`;
     }
 
     if (result.errors.length > 0) {
@@ -1163,6 +1335,7 @@
     const depth = parseInt(sessionStorage.getItem('reserved_depth') || '0');
     const receiverName = sessionStorage.getItem('reserved_receiver_name') || '';
     const receiverArea = sessionStorage.getItem('reserved_receiver_area') || '';
+    const reservedMeasurementMode = sessionStorage.getItem('reserved_measurement_mode') || 'manual';
 
     if (!reservation || !weight || !width || !height || !depth || !receiverName || !receiverArea) {
       showToast('필수 정보가 부족합니다.');
@@ -1203,7 +1376,13 @@
       branch: { code: branch.code, name: branch.name, hub: branch.hub },
       sender: { name: reservation.senderName },
       receiver: { name: receiverName, area: destination.name, region: destination.region },
-      item: { name: reservation.itemName, declaredValue: reservation.declaredValue || 0 },
+      item: {
+        name: reservation.itemName,
+        category: reservation.itemCategory || 'other',
+        declaredValue: reservation.declaredValue || 0,
+      },
+      delivery: { ...policy.DELIVERY_SERVICES[0] },
+      measurementMode: reservedMeasurementMode,
       intake: { type: 'reserved', details: { reservationNo } },
       raw: {
         senderName: reservation.senderName,
@@ -1244,6 +1423,7 @@
 
     submitting = false;
     sessionStorage.setItem('reserved_tracking_no', record.trackingNo);
+    rememberCustomerReceipt(record.trackingNo);
     sessionStorage.removeItem('reservation_no');
     sessionStorage.removeItem(`reserved_${reservationNo}_weight`);
     sessionStorage.removeItem('reserved_width');
@@ -1251,6 +1431,7 @@
     sessionStorage.removeItem('reserved_depth');
     sessionStorage.removeItem('reserved_receiver_name');
     sessionStorage.removeItem('reserved_receiver_area');
+    sessionStorage.removeItem('reserved_measurement_mode');
     navigate(`/shipments/reserved/${encodeURIComponent(reservationNo)}/complete`);
     showToast('접수가 완료되었습니다.');
   }
@@ -1271,6 +1452,7 @@
     const acceptedAt = new Date();
     const eta = domain.addBusinessDays(acceptedAt, policy.ETA_BUSINESS_DAYS[result.calculation.region]);
     const isReview = result.itemDecision.outcome === 'review';
+    const selectedService = deliveryServiceFor(values.deliveryService);
     const record = {
       requestId: makeId(),
       trackingNo: '',
@@ -1281,7 +1463,13 @@
       branch: { code: result.branch.code, name: result.branch.name, hub: result.branch.hub },
       sender: { name: values.senderName },
       receiver: { name: values.receiverName, area: result.destination.name, region: result.destination.region },
-      item: { name: values.itemName, declaredValue: domain.nonNegativeNumber(values.declaredValue) },
+      item: {
+        name: values.itemName,
+        category: values.itemCategory,
+        declaredValue: domain.nonNegativeNumber(values.declaredValue),
+      },
+      delivery: { ...selectedService },
+      measurementMode: values.measurementMode,
       intake: intakeForForm(document.getElementById('shipmentForm')?.dataset.intakeType),
       raw: { ...values },
       calculation: {
@@ -1294,7 +1482,8 @@
         dimensionSum: Math.round(result.calculation.dimensionSum * 10) / 10,
         grade: result.calculation.grade,
         region: result.calculation.region,
-        price: result.calculation.price,
+        basePrice: result.calculation.price,
+        price: result.calculation.price + selectedService.surcharge,
         etaDate: domain.formatDate(eta),
       },
       review: isReview
@@ -1313,6 +1502,7 @@
     }
 
     submitting = false;
+    rememberCustomerReceipt(record.trackingNo);
     navigate(`/shipments/complete/${encodeURIComponent(record.trackingNo)}`);
     showToast('접수가 완료되었습니다.');
   }
@@ -1455,6 +1645,9 @@
             <div><dt>보내는 분</dt><dd>${escapeHtml(shipment.sender.name)}</dd></div>
             <div><dt>받는 분</dt><dd>${escapeHtml(shipment.receiver.name)}</dd></div>
             <div><dt>도착 지역</dt><dd>${escapeHtml(shipment.receiver.area)} · ${escapeHtml(shipment.receiver.region)}</dd></div>
+            <div><dt>택배 서비스</dt><dd>${escapeHtml(shipment.delivery?.name || '일반 알뜰택배')}</dd></div>
+            <div><dt>측정 방식</dt><dd>${shipment.measurementMode === 'auto' ? '자동저울 테스트' : '수동 입력'}</dd></div>
+            <div><dt>품목 카테고리</dt><dd>${escapeHtml(itemCategoryLabel(shipment.item.category))}</dd></div>
             <div><dt>물품</dt><dd>${escapeHtml(shipment.item.name)}</dd></div>
             <div><dt>실제 무게</dt><dd>${formatNumber(shipment.calculation.weight, 2)}kg</dd></div>
             <div><dt>부피 무게</dt><dd>${formatNumber(shipment.calculation.volumeWeight, 2)}kg</dd></div>
@@ -1531,7 +1724,7 @@
   }
 
   function renderNotFound(message = '요청한 페이지를 찾을 수 없습니다.') {
-    app.innerHTML = `<div class="card empty-state"><strong>${escapeHtml(message)}</strong><a class="button primary" href="/" style="margin-top:14px">대시보드로 이동</a></div>`;
+    app.innerHTML = `<div class="card empty-state"><strong>${escapeHtml(message)}</strong><a class="button primary" href="/" style="margin-top:14px">처음으로 이동</a></div>`;
   }
 
   function route() {
@@ -1566,17 +1759,18 @@
     }
     else if (path === '/admin') renderDashboard();
     else if (path === '/admin/shipments') renderShipmentList();
+    else if (path.startsWith('/admin/shipments/')) {
+      const trackingNo = safeDecodePath(path.slice('/admin/shipments/'.length));
+      if (trackingNo) renderShipmentDetail(trackingNo);
+      else renderNotFound();
+    }
     else if (path === '/admin/policy') renderPolicy();
     else if (path.startsWith('/shipments/complete/')) {
       const trackingNo = safeDecodePath(path.slice('/shipments/complete/'.length));
       if (trackingNo) renderShipmentComplete(trackingNo);
       else renderNotFound();
     }
-    else if (path.startsWith('/shipments/')) {
-      const trackingNo = safeDecodePath(path.slice('/shipments/'.length));
-      if (trackingNo) renderShipmentDetail(trackingNo);
-      else renderNotFound();
-    }
+    else if (path.startsWith('/shipments/')) renderNotFound('고객 화면에서는 본인의 접수 완료 내역만 확인할 수 있습니다.');
     else renderNotFound();
     window.scrollTo({ top: 0, behavior: 'auto' });
   }

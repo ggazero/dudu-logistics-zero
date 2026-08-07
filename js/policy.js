@@ -31,6 +31,20 @@
 
   const ETA_BUSINESS_DAYS = { 일반: 1, 제주: 2, 도서산간: 3 };
   const STANDARD_STATUSES = ['집화처리', '간선상차', '간선하차', '배송출발', '배송완료', '미배송', '반품'];
+  // 정책서에 서비스별 추가요금이 없어 실습 화면에서만 사용하는 임시값이다.
+  const DELIVERY_SERVICES = [
+    { code: 'economy', name: '일반 알뜰택배', surcharge: 0, description: '기본 요금 · 정책 예정일 적용' },
+    { code: 'dawn', name: '새벽택배', surcharge: 3000, description: '실습 추가요금 3,000원' },
+    { code: 'same_day', name: '당일택배', surcharge: 5000, description: '실습 추가요금 5,000원' },
+  ];
+  const ITEM_CATEGORIES = [
+    { code: 'clothing', name: '의류' },
+    { code: 'books', name: '도서·문구' },
+    { code: 'living', name: '생활용품' },
+    { code: 'electronics', name: '전자기기' },
+    { code: 'food', name: '식품' },
+    { code: 'other', name: '직접 입력' },
+  ];
 
   // 문구만으로 확실하게 판정할 수 있는 품목만 자동 차단한다.
   const HARD_BANNED = [
@@ -54,6 +68,8 @@
     RATE_TABLE,
     ETA_BUSINESS_DAYS,
     STANDARD_STATUSES,
+    DELIVERY_SERVICES,
+    ITEM_CATEGORIES,
     HARD_BANNED,
     REVIEW_KEYWORDS,
   });
