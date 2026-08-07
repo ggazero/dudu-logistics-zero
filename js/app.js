@@ -1081,13 +1081,13 @@
 
   function route() {
     const raw = location.hash.slice(1) || '/';
-    const path = raw.split('?')[0];
+    const [path, queryString] = raw.split('?');
+    const params = new URLSearchParams(queryString || '');
     renderNav(path);
     updateReviewCount();
 
     if (path === '/') renderHome();
     else if (path === '/shipments/new') {
-      const params = new URLSearchParams(location.search);
       const type = params.get('type');
       if (type === 'reserved') renderReservedIntake();
       else if (type === 'customer') renderCustomerLogin();
@@ -1097,7 +1097,6 @@
       else renderNewShipment();
     }
     else if (path === '/shipments/new/form') {
-      const params = new URLSearchParams(location.search);
       const type = params.get('type');
       renderNewShipment(type);
     }
