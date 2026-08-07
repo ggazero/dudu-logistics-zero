@@ -33,7 +33,6 @@
       console.warn('브라우저 저장소에 기록하지 못했습니다.', error);
       showToast('브라우저 저장이 차단되어 현재 화면에서만 유지됩니다.');
     }
-    updateReviewCount();
   }
 
   function escapeHtml(value) {
@@ -90,12 +89,6 @@
     return '<span class="badge success">정상</span>';
   }
 
-  function updateReviewCount() {
-    const count = shipments.filter((shipment) => shipment.review?.status === 'pending').length;
-    const reviewCountEl = document.getElementById('reviewCount');
-    if (reviewCountEl) reviewCountEl.textContent = String(count);
-  }
-
   function renderNav(path, queryParams = {}) {
     const navEl = document.getElementById('mainNav');
     let html = '';
@@ -122,7 +115,6 @@
     } else if (path.startsWith('/admin')) {
       html = `<a href="/admin" data-route="/admin" class="active">대시보드</a>
               <a href="/admin/shipments" data-route="/admin/shipments">접수 목록</a>
-              <a href="/admin/reviews" data-route="/admin/reviews">보류 검토 <span id="reviewCount" class="nav-count">0</span></a>
               <a href="/admin/policy" data-route="/admin/policy">정책 보기</a>`;
     } else if (path.startsWith('/shipments/')) {
       html = '<a href="/" data-route="/">새 접수</a>';
@@ -1210,7 +1202,7 @@
     }
     const statusOptions = policy.STANDARD_STATUSES.map((status) => `<option value="${escapeHtml(status)}" ${status === shipment.status ? 'selected' : ''}>${escapeHtml(status)}</option>`).join('');
     const reviewBlock = shipment.review?.status === 'pending'
-      ? `<div class="result-state review"><strong>운영 확인 필요</strong>${escapeHtml(shipment.review.reason)}<br><a href="/admin/reviews">보류 검토 화면에서 처리하기 →</a></div>`
+      ? `<div class="result-state review"><strong>운영 확인 필요</strong>${escapeHtml(shipment.review.reason)}</div>`
       : shipment.review?.status === 'resolved'
         ? `<div class="result-state success"><strong>검토 완료 · ${escapeHtml(shipment.review.reviewer || '담당자 미기록')}</strong>${escapeHtml(shipment.review.note)}</div>`
         : '<div class="result-state success"><strong>정상 접수</strong>자동 차단 및 계산 규칙을 통과했습니다.</div>';
@@ -1264,47 +1256,6 @@
     });
   }
 
-  function renderReviews() {
-    const pending = shipments.filter((shipment) => shipment.review?.status === 'pending');
-    app.innerHTML = `${pageHead('Review queue', '보류 검토', '자료만으로 확정할 수 없는 접수를 삭제하거나 덮어쓰지 않고 운영자가 확인합니다.', '<a class="button" href="/admin/policy">판정 정책 보기</a>')}
-      ${pending.length === 0
-        ? '<div class="card empty-state"><strong>검토할 접수가 없습니다</strong>애매한 품목이나 운영 판단이 필요한 접수는 여기에 모입니다.</div>'
-        : `<div class="review-grid">${pending.map((shipment) => `<article class="review-card">
-            <span class="badge review">보류</span>
-            <h2><a class="tracking-link" href="/shipments/${encodeURIComponent(shipment.trackingNo)}">${escapeHtml(shipment.trackingNo)}</a></h2>
-            <p>${escapeHtml(shipment.review.reason)}</p>
-            <div class="review-meta">
-              <div><small>물품 원본</small><strong>${escapeHtml(shipment.raw.itemName)}</strong></div>
-              <div><small>택배 물품 가격</small><strong>${shipment.item.declaredValue === null ? '미입력' : formatWon(shipment.item.declaredValue)}</strong></div>
-              <div><small>접수 지점</small><strong>${escapeHtml(shipment.branch.name)}</strong></div>
-              <div><small>접수 일시</small><strong>${escapeHtml(formatDateTime(shipment.acceptedAt))}</strong></div>
-            </div>
-            <label for="reviewer-${escapeHtml(shipment.requestId)}" style="display:block;margin-bottom:6px;font-size:12px;font-weight:800">검토 담당자</label>
-            <input id="reviewer-${escapeHtml(shipment.requestId)}" class="review-note" data-reviewer-id="${escapeHtml(shipment.requestId)}" style="min-height:44px;margin-bottom:9px" placeholder="예: 이가영">
-            <label for="note-${escapeHtml(shipment.requestId)}" style="display:block;margin-bottom:6px;font-size:12px;font-weight:800">확인 근거 및 처리 내용</label>
-            <textarea id="note-${escapeHtml(shipment.requestId)}" class="review-note" data-note-id="${escapeHtml(shipment.requestId)}" placeholder="확인한 자료와 판단 근거를 남기세요"></textarea>
-            <div class="review-actions"><button class="button primary" data-resolve-id="${escapeHtml(shipment.requestId)}">검토 완료</button></div>
-          </article>`).join('')}</div>`}`;
-
-    document.querySelectorAll('[data-resolve-id]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const requestId = button.dataset.resolveId;
-        const reviewer = document.getElementById(`reviewer-${requestId}`).value.trim();
-        const note = document.getElementById(`note-${requestId}`).value.trim();
-        if (!reviewer || !note) {
-          showToast('검토 담당자와 판단 근거를 모두 입력해 주세요.');
-          return;
-        }
-        const shipment = shipments.find((item) => item.requestId === requestId);
-        if (!shipment) return;
-        shipment.review = { ...shipment.review, status: 'resolved', reviewer, note, reviewedAt: new Date().toISOString() };
-        persist();
-        renderReviews();
-        showToast('검토 결과와 근거를 저장했습니다.');
-      });
-    });
-  }
-
   function renderPolicy() {
     const rateRows = policy.RATE_TABLE.map((row) => `<tr><td><strong>${escapeHtml(row.grade)}</strong></td><td>${row.maxSum}cm 이하</td><td>${row.maxWeight}kg 이하</td><td>${formatWon(row.price.일반)}</td><td>${formatWon(row.price.제주)}</td><td>${formatWon(row.price.도서산간)}</td></tr>`).join('');
     app.innerHTML = `${pageHead('Policy', '데이터 처리 정책', `정책서 ${policy.VERSION} 기준으로 화면에 적용한 규칙입니다.`, '<a class="button primary" href="/">정책대로 접수하기</a>')}
@@ -1341,7 +1292,6 @@
     const params = new URLSearchParams(location.search);
     const queryParams = Object.fromEntries(params);
     renderNav(path, queryParams);
-    updateReviewCount();
 
     if (path === '/') renderHome();
     else if (path === '/shipments/new') {
@@ -1366,7 +1316,6 @@
     }
     else if (path === '/admin') renderDashboard();
     else if (path === '/admin/shipments') renderShipmentList();
-    else if (path === '/admin/reviews') renderReviews();
     else if (path === '/admin/policy') renderPolicy();
     else if (path.startsWith('/shipments/kakaotalk/')) renderKakaoTalkSent(decodeURIComponent(path.slice('/shipments/kakaotalk/'.length)));
     else if (path.startsWith('/shipments/')) renderShipmentDetail(decodeURIComponent(path.slice('/shipments/'.length)));
