@@ -153,19 +153,19 @@
   };
 
   function renderReservedIntake() {
-    app.innerHTML = `${pageHead('Reserved booking', '예약택배 접수', '사전 예약 시 발급받은 예약번호를 입력하세요.', '<a class="button" href="#/">← 돌아가기</a>')}
+    app.innerHTML = `${pageHead('Reserved booking', '예약택배 접수', '사전 예약 시 발급받은 예약번호를 입력해주세요. (선택사항)', '<a class="button" href="#/">← 돌아가기</a>')}
       <div class="form-layout">
         <form id="reservationForm" class="form-card" novalidate>
           <section class="form-section">
-            <div class="section-title"><span>1</span><h2>예약번호 입력</h2></div>
+            <div class="section-title"><span>1</span><h2>예약 정보</h2></div>
             <div class="form-group">
               <label for="reservationNo">예약번호</label>
-              <input type="text" id="reservationNo" placeholder="예: RES001" required style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+              <input type="text" id="reservationNo" placeholder="RES001 (선택사항, 미입력 시 RES001 사용)" style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
               <div style="font-size:13px;color:#667085;margin-top:4px;">샘플: RES001, RES002</div>
             </div>
           </section>
           <div class="button-row">
-            <button type="submit" class="button primary">예약 정보 조회</button>
+            <button type="submit" class="button primary">다음 (예약 정보)</button>
           </div>
         </form>
       </div>
@@ -173,12 +173,8 @@
 
     document.getElementById('reservationForm').addEventListener('submit', (e) => {
       e.preventDefault();
-      const resNo = document.getElementById('reservationNo').value.trim().toUpperCase();
-      const reservation = mockReservations[resNo];
-      if (!reservation) {
-        showToast('예약번호를 찾을 수 없습니다.');
-        return;
-      }
+      const resNo = document.getElementById('reservationNo').value.trim().toUpperCase() || 'RES001';
+      sessionStorage.setItem('reservation_no', resNo);
       location.hash = `#/shipments/reserved/${encodeURIComponent(resNo)}`;
     });
   }
@@ -403,18 +399,18 @@
   }
 
   function renderCustomerLogin() {
-    app.innerHTML = `${pageHead('Guest login', '비회원 택배접수', '휴대전화번호와 이름을 입력해주세요.', '<a class="button" href="#/">← 돌아가기</a>')}
+    app.innerHTML = `${pageHead('Guest login', '비회원 택배접수', '휴대전화번호와 이름을 입력해주세요. (선택사항)', '<a class="button" href="#/">← 돌아가기</a>')}
       <div class="form-layout">
         <form id="customerLoginForm" class="form-card" novalidate>
           <section class="form-section">
-            <div class="section-title"><span>1</span><h2>간편 로그인</h2></div>
+            <div class="section-title"><span>1</span><h2>비회원 정보</h2></div>
             <div class="form-group">
-              <label for="customerPhone">휴대전화번호 <span style="color:red;">*</span></label>
-              <input type="tel" id="customerPhone" placeholder="010-1234-5678" required style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+              <label for="customerName">이름</label>
+              <input type="text" id="customerName" placeholder="홍길동 (선택사항)" style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
             </div>
             <div class="form-group">
-              <label for="customerName">이름 <span style="color:red;">*</span></label>
-              <input type="text" id="customerName" placeholder="홍길동" required style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+              <label for="customerPhone">휴대전화번호</label>
+              <input type="tel" id="customerPhone" placeholder="010-1234-5678 (선택사항)" style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
             </div>
           </section>
           <div class="button-row">
@@ -428,10 +424,6 @@
       e.preventDefault();
       const phone = document.getElementById('customerPhone').value.trim();
       const name = document.getElementById('customerName').value.trim();
-      if (!phone || !name) {
-        showToast('모든 정보를 입력해주세요.');
-        return;
-      }
       sessionStorage.setItem('customer_phone', phone);
       sessionStorage.setItem('customer_name', name);
       location.hash = `#/shipments/new/form?type=customer`;
@@ -439,14 +431,14 @@
   }
 
   function renderMemberLogin() {
-    app.innerHTML = `${pageHead('Member login', '회원 택배접수', '회원번호를 입력해주세요.', '<a class="button" href="#/">← 돌아가기</a>')}
+    app.innerHTML = `${pageHead('Member login', '회원 택배접수', '회원번호를 입력해주세요. (선택사항)', '<a class="button" href="#/">← 돌아가기</a>')}
       <div class="form-layout">
         <form id="memberLoginForm" class="form-card" novalidate>
           <section class="form-section">
-            <div class="section-title"><span>1</span><h2>회원 인증</h2></div>
+            <div class="section-title"><span>1</span><h2>회원 정보</h2></div>
             <div class="form-group">
-              <label for="memberNo">회원번호 <span style="color:red;">*</span></label>
-              <input type="text" id="memberNo" placeholder="예: MEM123456" required style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+              <label for="memberNo">회원번호</label>
+              <input type="text" id="memberNo" placeholder="MEM123456 (선택사항)" style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
               <div style="font-size:13px;color:#667085;margin-top:4px;">가입 시 발급받은 회원번호를 입력하세요.</div>
             </div>
           </section>
@@ -460,24 +452,24 @@
     document.getElementById('memberLoginForm').addEventListener('submit', (e) => {
       e.preventDefault();
       const memberNo = document.getElementById('memberNo').value.trim().toUpperCase();
-      if (!memberNo) {
-        showToast('회원번호를 입력해주세요.');
-        return;
-      }
       sessionStorage.setItem('member_no', memberNo);
       location.hash = `#/shipments/new/form?type=member`;
     });
   }
 
   function renderShoppingLogin() {
-    app.innerHTML = `${pageHead('Shopping login', '쇼핑몰 접수', '쇼핑몰 사업자번호를 입력해주세요.', '<a class="button" href="#/">← 돌아가기</a>')}
+    app.innerHTML = `${pageHead('Shopping login', '쇼핑몰 접수', '쇼핑몰 정보를 입력해주세요. (선택사항)', '<a class="button" href="#/">← 돌아가기</a>')}
       <div class="form-layout">
         <form id="shoppingLoginForm" class="form-card" novalidate>
           <section class="form-section">
-            <div class="section-title"><span>1</span><h2>쇼핑몰 인증</h2></div>
+            <div class="section-title"><span>1</span><h2>쇼핑몰 정보</h2></div>
             <div class="form-group">
-              <label for="shoppingNo">사업자번호 <span style="color:red;">*</span></label>
-              <input type="text" id="shoppingNo" placeholder="예: 123-45-67890" required style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+              <label for="shoppingName">쇼핑몰 이름</label>
+              <input type="text" id="shoppingName" placeholder="예: 홍길동 쇼핑몰 (선택사항)" style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+            </div>
+            <div class="form-group">
+              <label for="shoppingNo">사업자번호</label>
+              <input type="text" id="shoppingNo" placeholder="123-45-67890 (선택사항)" style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
               <div style="font-size:13px;color:#667085;margin-top:4px;">쇼핑몰 등록 시 발급받은 사업자번호를 입력하세요.</div>
             </div>
           </section>
@@ -490,25 +482,23 @@
 
     document.getElementById('shoppingLoginForm').addEventListener('submit', (e) => {
       e.preventDefault();
+      const shoppingName = document.getElementById('shoppingName').value.trim();
       const shoppingNo = document.getElementById('shoppingNo').value.trim();
-      if (!shoppingNo) {
-        showToast('사업자번호를 입력해주세요.');
-        return;
-      }
+      sessionStorage.setItem('shopping_name', shoppingName);
       sessionStorage.setItem('shopping_no', shoppingNo);
       location.hash = `#/shipments/new/form?type=shopping`;
     });
   }
 
   function renderBranchLogin() {
-    app.innerHTML = `${pageHead('Branch login', '점간 택배접수', '지점 고유번호를 입력해주세요.', '<a class="button" href="#/">← 돌아가기</a>')}
+    app.innerHTML = `${pageHead('Branch login', '점간 택배접수', '지점 고유번호를 입력해주세요. (선택사항)', '<a class="button" href="#/">← 돌아가기</a>')}
       <div class="form-layout">
         <form id="branchLoginForm" class="form-card" novalidate>
           <section class="form-section">
-            <div class="section-title"><span>1</span><h2>지점 인증</h2></div>
+            <div class="section-title"><span>1</span><h2>지점 정보</h2></div>
             <div class="form-group">
-              <label for="branchNo">지점 고유번호 <span style="color:red;">*</span></label>
-              <input type="text" id="branchNo" placeholder="예: BR-11-0001" required style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+              <label for="branchNo">지점 고유번호</label>
+              <input type="text" id="branchNo" placeholder="BR-11-0001 (선택사항)" style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
               <div style="font-size:13px;color:#667085;margin-top:4px;">귀사 지점에 할당된 고유번호를 입력하세요.</div>
             </div>
           </section>
@@ -522,10 +512,6 @@
     document.getElementById('branchLoginForm').addEventListener('submit', (e) => {
       e.preventDefault();
       const branchNo = document.getElementById('branchNo').value.trim().toUpperCase();
-      if (!branchNo) {
-        showToast('지점 고유번호를 입력해주세요.');
-        return;
-      }
       sessionStorage.setItem('branch_no', branchNo);
       location.hash = `#/shipments/new/form?type=branch`;
     });
