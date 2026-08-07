@@ -86,7 +86,8 @@
 
   function updateReviewCount() {
     const count = shipments.filter((shipment) => shipment.review?.status === 'pending').length;
-    document.getElementById('reviewCount').textContent = String(count);
+    const reviewCountEl = document.getElementById('reviewCount');
+    if (reviewCountEl) reviewCountEl.textContent = String(count);
   }
 
   function renderNav(path) {
