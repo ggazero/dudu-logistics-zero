@@ -398,7 +398,7 @@
                 <label for="receiverArea">도착지역 <span style="color:var(--red);">*</span></label>
                 <select id="receiverArea" style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
                   <option value="">선택해주세요</option>
-                  ${policy.AREAS.map(area => `<option value="${area}">${area}</option>`).join('')}
+                  ${policy.DESTINATIONS.map((area) => `<option value="${escapeHtml(area.name)}">${escapeHtml(area.name)} · ${escapeHtml(area.region)}</option>`).join('')}
                 </select>
               </div>
             </div>
@@ -930,8 +930,8 @@
 
     submitting = true;
     const acceptedAt = new Date();
-    const branch = policy.BRANCHES.find(b => b.code === '01') || policy.BRANCHES[0];
-    const destination = policy.AREAS.find(a => a.name === receiverArea);
+    const branch = policy.BRANCHES[0];
+    const destination = domain.findDestination(receiverArea);
     if (!destination) {
       submitting = false;
       showToast('도착지역을 다시 확인해 주세요.');
@@ -945,18 +945,18 @@
       return;
     }
 
-    const calculation = {
+    const calculation = domain.calculate({
       weight,
       width,
       height,
       depth,
-      volumeWeight: (width * height * depth) / 6000,
-      billedWeight: Math.max(weight, (width * height * depth) / 6000),
-      dimensionSum: width + height + depth,
-      region: destination.region,
-      grade: domain.calculateGrade(Math.max(weight, (width * height * depth) / 6000), width + height + depth),
-    };
-    calculation.price = domain.calculatePrice(calculation.grade, calculation.region);
+      destination: receiverArea,
+    });
+    if (!calculation.ok) {
+      submitting = false;
+      showToast(calculation.errors.join(' '));
+      return;
+    }
 
     const eta = domain.addBusinessDays(acceptedAt, policy.ETA_BUSINESS_DAYS[calculation.region]);
     const record = {
