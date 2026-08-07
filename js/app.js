@@ -10,6 +10,12 @@
   let submitting = false;
   let toastTimer = null;
 
+  function navigate(path, { replace = false } = {}) {
+    if (replace) history.replaceState({}, '', path);
+    else history.pushState({}, '', path);
+    route();
+  }
+
   function loadShipments() {
     try {
       const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
@@ -95,7 +101,7 @@
     let html = '';
 
     if (path === '/' || (path === '/shipments/new' && !queryParams.type)) {
-      html = '<a href="#/" data-route="/" class="active">새 접수</a>';
+      html = '<a href="/" data-route="/" class="active">새 접수</a>';
     } else if ((path === '/shipments/new' && queryParams.type) || path === '/shipments/new/form') {
       const steps = [
         { num: 1, label: '접수정보' },
@@ -112,14 +118,14 @@
           </div>
         `).join('')}
       </div>
-      <a href="#/" style="margin-left:auto;">← 돌아가기</a>`;
+      <a href="/" style="margin-left:auto;">← 돌아가기</a>`;
     } else if (path.startsWith('/admin')) {
-      html = `<a href="#/admin" data-route="/admin" class="active">대시보드</a>
-              <a href="#/admin/shipments" data-route="/admin/shipments">접수 목록</a>
-              <a href="#/admin/reviews" data-route="/admin/reviews">보류 검토 <span id="reviewCount" class="nav-count">0</span></a>
-              <a href="#/admin/policy" data-route="/admin/policy">정책 보기</a>`;
+      html = `<a href="/admin" data-route="/admin" class="active">대시보드</a>
+              <a href="/admin/shipments" data-route="/admin/shipments">접수 목록</a>
+              <a href="/admin/reviews" data-route="/admin/reviews">보류 검토 <span id="reviewCount" class="nav-count">0</span></a>
+              <a href="/admin/policy" data-route="/admin/policy">정책 보기</a>`;
     } else if (path.startsWith('/shipments/')) {
-      html = '<a href="#/" data-route="/">새 접수</a>';
+      html = '<a href="/" data-route="/">새 접수</a>';
     }
 
     navEl.innerHTML = html;
@@ -180,7 +186,7 @@
       return '<tr><td colspan="8"><div class="empty-state"><strong>표시할 접수가 없습니다</strong>새 접수를 등록하거나 검색 조건을 바꿔보세요.</div></td></tr>';
     }
     return rows.map((shipment) => `<tr>
-      <td><a class="tracking-link" href="#/shipments/${encodeURIComponent(shipment.trackingNo)}">${escapeHtml(shipment.trackingNo)}</a></td>
+      <td><a class="tracking-link" href="/shipments/${encodeURIComponent(shipment.trackingNo)}">${escapeHtml(shipment.trackingNo)}</a></td>
       <td>${escapeHtml(shipment.branch.name)}</td>
       <td>${escapeHtml(shipment.receiver.name)}</td>
       <td>${escapeHtml(shipment.item.name)}</td>
@@ -207,7 +213,7 @@
   };
 
   function renderReservedIntake() {
-    app.innerHTML = `${pageHead('Reserved booking', '예약택배 접수', '사전 예약 시 발급받은 예약번호를 입력해주세요. (선택사항)', '<a class="button" href="#/">← 돌아가기</a>')}
+    app.innerHTML = `${pageHead('Reserved booking', '예약택배 접수', '사전 예약 시 발급받은 예약번호를 입력해주세요. (선택사항)', '<a class="button" href="/">← 돌아가기</a>')}
       <div class="form-layout">
         <form id="reservationForm" class="form-card" novalidate>
           <section class="form-section">
@@ -263,7 +269,7 @@
       sessionStorage.setItem('reserved_width', width);
       sessionStorage.setItem('reserved_height', height);
       sessionStorage.setItem('reserved_depth', depth);
-      location.hash = `#/shipments/reserved/${encodeURIComponent(resNo)}`;
+      navigate(`/shipments/reserved/${encodeURIComponent(resNo)}`);
     });
   }
 
@@ -275,24 +281,24 @@
           <p style="font-size:16px;color:#667085;margin:8px 0 0 0;">접수 방식을 선택해주세요</p>
         </div>
         <div style="display:flex;flex-direction:column;gap:16px;max-width:600px;width:100%;">
-          <a href="#/shipments/new?type=reserved" style="padding:32px 24px;border:2px solid #0066cc;border-radius:8px;text-align:center;text-decoration:none;color:white;background:#0066cc;transition:all 0.2s;cursor:pointer;" onmouseover="this.style.backgroundColor='#0052a3'" onmouseout="this.style.backgroundColor='#0066cc'">
+          <a href="/shipments/new?type=reserved" style="padding:32px 24px;border:2px solid #0066cc;border-radius:8px;text-align:center;text-decoration:none;color:white;background:#0066cc;transition:all 0.2s;cursor:pointer;" onmouseover="this.style.backgroundColor='#0052a3'" onmouseout="this.style.backgroundColor='#0066cc'">
             <div style="font-size:18px;font-weight:600;margin-bottom:8px;">예약택배 접수</div>
             <div style="font-size:14px;color:rgba(255,255,255,0.9);">사전 예약 접수</div>
           </a>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-            <a href="#/shipments/new?type=customer" style="padding:32px 24px;border:2px solid #dfe4ec;border-radius:8px;text-align:center;text-decoration:none;color:#172033;background:white;transition:all 0.2s;cursor:pointer;" onmouseover="this.style.borderColor='#0066cc';this.style.backgroundColor='#f5f9ff'" onmouseout="this.style.borderColor='#dfe4ec';this.style.backgroundColor='white'">
+            <a href="/shipments/new?type=customer" style="padding:32px 24px;border:2px solid #dfe4ec;border-radius:8px;text-align:center;text-decoration:none;color:#172033;background:white;transition:all 0.2s;cursor:pointer;" onmouseover="this.style.borderColor='#0066cc';this.style.backgroundColor='#f5f9ff'" onmouseout="this.style.borderColor='#dfe4ec';this.style.backgroundColor='white'">
               <div style="font-size:18px;font-weight:600;margin-bottom:8px;">비회원 택배접수</div>
               <div style="font-size:14px;color:#667085;">회원 가입 없이 접수</div>
             </a>
-            <a href="#/shipments/new?type=member" style="padding:32px 24px;border:2px solid #dfe4ec;border-radius:8px;text-align:center;text-decoration:none;color:#172033;background:white;transition:all 0.2s;cursor:pointer;" onmouseover="this.style.borderColor='#0066cc';this.style.backgroundColor='#f5f9ff'" onmouseout="this.style.borderColor='#dfe4ec';this.style.backgroundColor='white'">
+            <a href="/shipments/new?type=member" style="padding:32px 24px;border:2px solid #dfe4ec;border-radius:8px;text-align:center;text-decoration:none;color:#172033;background:white;transition:all 0.2s;cursor:pointer;" onmouseover="this.style.borderColor='#0066cc';this.style.backgroundColor='#f5f9ff'" onmouseout="this.style.borderColor='#dfe4ec';this.style.backgroundColor='white'">
               <div style="font-size:18px;font-weight:600;margin-bottom:8px;">회원 택배접수</div>
               <div style="font-size:14px;color:#667085;">회원 정보로 접수</div>
             </a>
-            <a href="#/shipments/new?type=shopping" style="padding:32px 24px;border:2px solid #dfe4ec;border-radius:8px;text-align:center;text-decoration:none;color:#172033;background:white;transition:all 0.2s;cursor:pointer;" onmouseover="this.style.borderColor='#0066cc';this.style.backgroundColor='#f5f9ff'" onmouseout="this.style.borderColor='#dfe4ec';this.style.backgroundColor='white'">
+            <a href="/shipments/new?type=shopping" style="padding:32px 24px;border:2px solid #dfe4ec;border-radius:8px;text-align:center;text-decoration:none;color:#172033;background:white;transition:all 0.2s;cursor:pointer;" onmouseover="this.style.borderColor='#0066cc';this.style.backgroundColor='#f5f9ff'" onmouseout="this.style.borderColor='#dfe4ec';this.style.backgroundColor='white'">
               <div style="font-size:18px;font-weight:600;margin-bottom:8px;">쇼핑몰 접수</div>
               <div style="font-size:14px;color:#667085;">쇼핑몰 연동 접수</div>
             </a>
-            <a href="#/shipments/new?type=branch" style="padding:32px 24px;border:2px solid #dfe4ec;border-radius:8px;text-align:center;text-decoration:none;color:#172033;background:white;transition:all 0.2s;cursor:pointer;" onmouseover="this.style.borderColor='#0066cc';this.style.backgroundColor='#f5f9ff'" onmouseout="this.style.borderColor='#dfe4ec';this.style.backgroundColor='white'">
+            <a href="/shipments/new?type=branch" style="padding:32px 24px;border:2px solid #dfe4ec;border-radius:8px;text-align:center;text-decoration:none;color:#172033;background:white;transition:all 0.2s;cursor:pointer;" onmouseover="this.style.borderColor='#0066cc';this.style.backgroundColor='#f5f9ff'" onmouseout="this.style.borderColor='#dfe4ec';this.style.backgroundColor='white'">
               <div style="font-size:18px;font-weight:600;margin-bottom:8px;">점간 택배접수</div>
               <div style="font-size:14px;color:#667085;">지점 간 접수</div>
             </a>
@@ -310,7 +316,7 @@
     const totalPrice = shipments.reduce((sum, shipment) => sum + Number(shipment.calculation.price || 0), 0);
     const recent = [...shipments].sort((a, b) => new Date(b.acceptedAt) - new Date(a.acceptedAt)).slice(0, 5);
 
-    app.innerHTML = `${pageHead('Dashboard', '오늘의 접수 흐름을 한눈에', '정상 접수와 운영 확인이 필요한 건을 분리해 확인합니다.', '<a class="button primary" href="#/">+ 새 접수 시작</a>')}
+    app.innerHTML = `${pageHead('Dashboard', '오늘의 접수 흐름을 한눈에', '정상 접수와 운영 확인이 필요한 건을 분리해 확인합니다.', '<a class="button primary" href="/">+ 새 접수 시작</a>')}
       <section class="metric-grid" aria-label="접수 요약">
         <article class="metric-card"><div class="metric-label">오늘 접수</div><div class="metric-value">${todayCount}</div><div class="metric-note">${today}</div></article>
         <article class="metric-card attention"><div class="metric-label">운영 확인 필요</div><div class="metric-value">${pendingCount}</div><div class="metric-note">임의 확정하지 않은 접수</div></article>
@@ -319,8 +325,8 @@
       </section>
       <section class="section-grid">
         <article class="card">
-          <div class="card-head"><h2>최근 접수</h2><a href="#/admin/shipments">전체 보기 →</a></div>
-          ${recent.length ? shipmentTable(recent) : '<div class="empty-state"><strong>아직 접수 내역이 없습니다</strong>첫 접수를 등록하면 최근 내역이 표시됩니다.<div class="button-row" style="justify-content:center;margin-top:16px"><a class="button primary" href="#/">새 접수</a></div></div>'}
+          <div class="card-head"><h2>최근 접수</h2><a href="/admin/shipments">전체 보기 →</a></div>
+          ${recent.length ? shipmentTable(recent) : '<div class="empty-state"><strong>아직 접수 내역이 없습니다</strong>첫 접수를 등록하면 최근 내역이 표시됩니다.<div class="button-row" style="justify-content:center;margin-top:16px"><a class="button primary" href="/">새 접수</a></div></div>'}
         </article>
         <aside class="card">
           <div class="card-head"><h2>정책 적용 순서</h2></div>
@@ -346,7 +352,7 @@
       return;
     }
 
-    app.innerHTML = `${pageHead('Reserved form', '예약택배 - 수령인 정보', '예약된 기본 정보는 읽기전용입니다. 수령인 정보를 입력해주세요.', '<a class="button" href="#/">← 처음으로</a>')}
+    app.innerHTML = `${pageHead('Reserved form', '예약택배 - 수령인 정보', '예약된 기본 정보는 읽기전용입니다. 수령인 정보를 입력해주세요.', '<a class="button" href="/">← 처음으로</a>')}
       <div class="form-layout">
         <form id="reservedWeightForm" class="form-card" novalidate>
           <section class="form-section">
@@ -430,7 +436,7 @@
       sessionStorage.setItem('reserved_receiver_name', receiverName);
       sessionStorage.setItem('reserved_receiver_area', receiverArea);
       sessionStorage.setItem(`reserved_${reservationNo}_weight`, savedWeight);
-      location.hash = `#/shipments/reserved/${encodeURIComponent(reservationNo)}/review`;
+      navigate(`/shipments/reserved/${encodeURIComponent(reservationNo)}/review`);
     });
   }
 
@@ -448,7 +454,7 @@
       return;
     }
 
-    app.innerHTML = `${pageHead('Reserved review', '예약택배 - 내용확인', '입력하신 내용을 확인하고 접수를 완료해주세요.', '<a class="button" href="#/shipments/reserved/' + encodeURIComponent(reservationNo) + '">← 돌아가기</a>')}
+    app.innerHTML = `${pageHead('Reserved review', '예약택배 - 내용확인', '입력하신 내용을 확인하고 접수를 완료해주세요.', '<a class="button" href="/shipments/reserved/' + encodeURIComponent(reservationNo) + '">← 돌아가기</a>')}
       <div class="form-layout">
         <article class="form-card">
           <section class="form-section">
@@ -527,14 +533,14 @@
           </div>
         </article>
         <div class="button-row">
-          <a href="#/" class="button primary">홈으로 돌아가기</a>
+          <a href="/" class="button primary">홈으로 돌아가기</a>
         </div>
       </div>
     `;
   }
 
   function renderCustomerLogin() {
-    app.innerHTML = `${pageHead('Guest login', '비회원 택배접수', '휴대전화번호와 이름을 입력해주세요. (선택사항)', '<a class="button" href="#/">← 돌아가기</a>')}
+    app.innerHTML = `${pageHead('Guest login', '비회원 택배접수', '휴대전화번호와 이름을 입력해주세요. (선택사항)', '<a class="button" href="/">← 돌아가기</a>')}
       <div class="form-layout">
         <form id="customerLoginForm" class="form-card" novalidate>
           <section class="form-section">
@@ -561,12 +567,12 @@
       const name = document.getElementById('customerName').value.trim();
       sessionStorage.setItem('customer_phone', phone);
       sessionStorage.setItem('customer_name', name);
-      location.hash = `#/shipments/new/form?type=customer`;
+      navigate('/shipments/new/form?type=customer');
     });
   }
 
   function renderMemberLogin() {
-    app.innerHTML = `${pageHead('Member login', '회원 택배접수', '회원번호를 입력해주세요. (선택사항)', '<a class="button" href="#/">← 돌아가기</a>')}
+    app.innerHTML = `${pageHead('Member login', '회원 택배접수', '회원번호를 입력해주세요. (선택사항)', '<a class="button" href="/">← 돌아가기</a>')}
       <div class="form-layout">
         <form id="memberLoginForm" class="form-card" novalidate>
           <section class="form-section">
@@ -588,12 +594,12 @@
       e.preventDefault();
       const memberNo = document.getElementById('memberNo').value.trim().toUpperCase();
       sessionStorage.setItem('member_no', memberNo);
-      location.hash = `#/shipments/new/form?type=member`;
+      navigate('/shipments/new/form?type=member');
     });
   }
 
   function renderShoppingLogin() {
-    app.innerHTML = `${pageHead('Shopping login', '쇼핑몰 접수', '쇼핑몰 정보를 입력해주세요. (선택사항)', '<a class="button" href="#/">← 돌아가기</a>')}
+    app.innerHTML = `${pageHead('Shopping login', '쇼핑몰 접수', '쇼핑몰 정보를 입력해주세요. (선택사항)', '<a class="button" href="/">← 돌아가기</a>')}
       <div class="form-layout">
         <form id="shoppingLoginForm" class="form-card" novalidate>
           <section class="form-section">
@@ -621,12 +627,12 @@
       const shoppingNo = document.getElementById('shoppingNo').value.trim();
       sessionStorage.setItem('shopping_name', shoppingName);
       sessionStorage.setItem('shopping_no', shoppingNo);
-      location.hash = `#/shipments/new/form?type=shopping`;
+      navigate('/shipments/new/form?type=shopping');
     });
   }
 
   function renderBranchLogin() {
-    app.innerHTML = `${pageHead('Branch login', '점간 택배접수', '지점 고유번호를 입력해주세요. (선택사항)', '<a class="button" href="#/">← 돌아가기</a>')}
+    app.innerHTML = `${pageHead('Branch login', '점간 택배접수', '지점 고유번호를 입력해주세요. (선택사항)', '<a class="button" href="/">← 돌아가기</a>')}
       <div class="form-layout">
         <form id="branchLoginForm" class="form-card" novalidate>
           <section class="form-section">
@@ -648,7 +654,7 @@
       e.preventDefault();
       const branchNo = document.getElementById('branchNo').value.trim().toUpperCase();
       sessionStorage.setItem('branch_no', branchNo);
-      location.hash = `#/shipments/new/form?type=branch`;
+      navigate('/shipments/new/form?type=branch');
     });
   }
 
@@ -690,8 +696,8 @@
           </div>
         </article>
         <div class="button-row">
-          <a href="#/admin/shipments" class="button">접수목록 보기</a>
-          <a href="#/" class="button primary">홈으로 돌아가기</a>
+          <a href="/admin/shipments" class="button">접수목록 보기</a>
+          <a href="/" class="button primary">홈으로 돌아가기</a>
         </div>
       </div>
     `;
@@ -707,7 +713,7 @@
     const branchOptions = policy.BRANCHES.map((branch) => `<option value="${branch.code}">${escapeHtml(branch.name)} · ${escapeHtml(branch.hub)}</option>`).join('');
     const destinationOptions = policy.DESTINATIONS.map((area) => `<option value="${escapeHtml(area.name)}">${escapeHtml(area.name)} · ${escapeHtml(area.region)}</option>`).join('');
 
-    app.innerHTML = `${pageHead('New shipment', '새 접수', '표준 입력값만 받고 계산값은 직접 수정할 수 없도록 구성했습니다.', '<a class="button secondary" href="#/admin/policy">정책 보기</a>')}
+    app.innerHTML = `${pageHead('New shipment', '새 접수', '표준 입력값만 받고 계산값은 직접 수정할 수 없도록 구성했습니다.', '<a class="button secondary" href="/admin/policy">정책 보기</a>')}
       <div class="notice">현재 버전은 서버가 아닌 이 브라우저의 localStorage에 저장됩니다. 전사 운송장 중복 방지는 DB 연결 단계에서 최종 적용해야 합니다.</div>
       <div class="form-layout shipment-layout">
         <form id="shipmentForm" class="form-card" novalidate>
@@ -1026,7 +1032,7 @@
     sessionStorage.removeItem('reserved_depth');
     sessionStorage.removeItem('reserved_receiver_name');
     sessionStorage.removeItem('reserved_receiver_area');
-    location.hash = `#/shipments/reserved/${encodeURIComponent(reservationNo)}/complete`;
+    navigate(`/shipments/reserved/${encodeURIComponent(reservationNo)}/complete`);
     showToast('접수가 완료되었습니다.');
   }
 
@@ -1100,7 +1106,7 @@
     }
 
     submitting = false;
-    location.hash = `#/shipments/kakaotalk/${encodeURIComponent(trackingNo)}`;
+    navigate(`/shipments/kakaotalk/${encodeURIComponent(trackingNo)}`);
     showToast('접수가 완료되었습니다. 카카오톡으로 내용이 전송되었습니다.');
   }
 
