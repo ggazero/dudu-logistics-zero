@@ -90,12 +90,10 @@
   }
 
   function setActiveNav(route) {
-    let active = 'home';
-    if (route === '/shipments/new') active = 'new';
-    else if (route === '/shipments') active = 'list';
-    else if (route.startsWith('/shipments/')) active = 'list';
-    else if (route === '/reviews') active = 'reviews';
-    else if (route === '/policy') active = 'policy';
+    let active = '/';
+    if (route === '/') active = '/';
+    else if (route.startsWith('/admin')) active = '/admin';
+    else if (route.startsWith('/shipments/')) active = '/';
     document.querySelectorAll('.main-nav a').forEach((link) => {
       link.classList.toggle('active', link.dataset.route === active);
     });
@@ -134,7 +132,7 @@
     const totalPrice = shipments.reduce((sum, shipment) => sum + Number(shipment.calculation.price || 0), 0);
     const recent = [...shipments].sort((a, b) => new Date(b.acceptedAt) - new Date(a.acceptedAt)).slice(0, 5);
 
-    app.innerHTML = `${pageHead('Dashboard', '오늘의 접수 흐름을 한눈에', '정상 접수와 운영 확인이 필요한 건을 분리해 확인합니다.', '<a class="button primary" href="#/shipments/new">+ 새 접수 시작</a>')}
+    app.innerHTML = `${pageHead('Dashboard', '오늘의 접수 흐름을 한눈에', '정상 접수와 운영 확인이 필요한 건을 분리해 확인합니다.', '<a class="button primary" href="#/">+ 새 접수 시작</a>')}
       <section class="metric-grid" aria-label="접수 요약">
         <article class="metric-card"><div class="metric-label">오늘 접수</div><div class="metric-value">${todayCount}</div><div class="metric-note">${today}</div></article>
         <article class="metric-card attention"><div class="metric-label">운영 확인 필요</div><div class="metric-value">${pendingCount}</div><div class="metric-note">임의 확정하지 않은 접수</div></article>
@@ -143,8 +141,8 @@
       </section>
       <section class="section-grid">
         <article class="card">
-          <div class="card-head"><h2>최근 접수</h2><a href="#/shipments">전체 보기 →</a></div>
-          ${recent.length ? shipmentTable(recent) : '<div class="empty-state"><strong>아직 접수 내역이 없습니다</strong>첫 접수를 등록하면 최근 내역이 표시됩니다.<div class="button-row" style="justify-content:center;margin-top:16px"><a class="button primary" href="#/shipments/new">새 접수</a></div></div>'}
+          <div class="card-head"><h2>최근 접수</h2><a href="#/admin/shipments">전체 보기 →</a></div>
+          ${recent.length ? shipmentTable(recent) : '<div class="empty-state"><strong>아직 접수 내역이 없습니다</strong>첫 접수를 등록하면 최근 내역이 표시됩니다.<div class="button-row" style="justify-content:center;margin-top:16px"><a class="button primary" href="#/">새 접수</a></div></div>'}
         </article>
         <aside class="card">
           <div class="card-head"><h2>정책 적용 순서</h2></div>
@@ -162,7 +160,7 @@
     const branchOptions = policy.BRANCHES.map((branch) => `<option value="${branch.code}">${escapeHtml(branch.name)} · ${escapeHtml(branch.hub)}</option>`).join('');
     const destinationOptions = policy.DESTINATIONS.map((area) => `<option value="${escapeHtml(area.name)}">${escapeHtml(area.name)} · ${escapeHtml(area.region)}</option>`).join('');
 
-    app.innerHTML = `${pageHead('New shipment', '새 접수', '표준 입력값만 받고 계산값은 직접 수정할 수 없도록 구성했습니다.', '<a class="button" href="#/policy">적용 정책 보기</a>')}
+    app.innerHTML = `${pageHead('New shipment', '새 접수', '표준 입력값만 받고 계산값은 직접 수정할 수 없도록 구성했습니다.', '<a class="button" href="#/admin/policy">적용 정책 보기</a>')}
       <div class="notice">현재 버전은 서버가 아닌 이 브라우저의 localStorage에 저장됩니다. 전사 운송장 중복 방지는 DB 연결 단계에서 최종 적용해야 합니다.</div>
       <div class="form-layout">
         <form id="shipmentForm" class="form-card" novalidate>
@@ -394,7 +392,7 @@
 
   function renderShipmentList() {
     const sorted = [...shipments].sort((a, b) => new Date(b.acceptedAt) - new Date(a.acceptedAt));
-    app.innerHTML = `${pageHead('Shipments', '접수 목록', '운송장·이름·물품으로 검색하고 정책 판정 상태를 확인합니다.', '<a class="button primary" href="#/shipments/new">+ 새 접수</a>')}
+    app.innerHTML = `${pageHead('Shipments', '접수 목록', '운송장·이름·물품으로 검색하고 정책 판정 상태를 확인합니다.', '<a class="button primary" href="#/">+ 새 접수</a>')}
       <div class="toolbar"><input id="shipmentSearch" type="search" placeholder="운송장, 받는 분, 물품 검색" aria-label="접수 검색"></div>
       ${shipmentTable(sorted)}`;
 
@@ -416,12 +414,12 @@
     }
     const statusOptions = policy.STANDARD_STATUSES.map((status) => `<option value="${escapeHtml(status)}" ${status === shipment.status ? 'selected' : ''}>${escapeHtml(status)}</option>`).join('');
     const reviewBlock = shipment.review?.status === 'pending'
-      ? `<div class="result-state review"><strong>운영 확인 필요</strong>${escapeHtml(shipment.review.reason)}<br><a href="#/reviews">보류 검토 화면에서 처리하기 →</a></div>`
+      ? `<div class="result-state review"><strong>운영 확인 필요</strong>${escapeHtml(shipment.review.reason)}<br><a href="#/admin/reviews">보류 검토 화면에서 처리하기 →</a></div>`
       : shipment.review?.status === 'resolved'
         ? `<div class="result-state success"><strong>검토 완료 · ${escapeHtml(shipment.review.reviewer || '담당자 미기록')}</strong>${escapeHtml(shipment.review.note)}</div>`
         : '<div class="result-state success"><strong>정상 접수</strong>자동 차단 및 계산 규칙을 통과했습니다.</div>';
 
-    app.innerHTML = `${pageHead('Shipment detail', '접수 상세', '입력 원본과 정책에 따라 계산된 값을 함께 확인합니다.', '<div class="button-row"><a class="button" href="#/shipments">← 목록</a><a class="button primary" href="#/shipments/new">+ 새 접수</a></div>')}
+    app.innerHTML = `${pageHead('Shipment detail', '접수 상세', '입력 원본과 정책에 따라 계산된 값을 함께 확인합니다.', '<div class="button-row"><a class="button" href="#/admin/shipments">← 목록</a><a class="button primary" href="#/">+ 새 접수</a></div>')}
       <div class="detail-grid">
         <section class="card">
           <div class="tracking-number"><small>운송장 번호</small><strong>${escapeHtml(shipment.trackingNo)}</strong></div>
@@ -472,7 +470,7 @@
 
   function renderReviews() {
     const pending = shipments.filter((shipment) => shipment.review?.status === 'pending');
-    app.innerHTML = `${pageHead('Review queue', '보류 검토', '자료만으로 확정할 수 없는 접수를 삭제하거나 덮어쓰지 않고 운영자가 확인합니다.', '<a class="button" href="#/policy">판정 정책 보기</a>')}
+    app.innerHTML = `${pageHead('Review queue', '보류 검토', '자료만으로 확정할 수 없는 접수를 삭제하거나 덮어쓰지 않고 운영자가 확인합니다.', '<a class="button" href="#/admin/policy">판정 정책 보기</a>')}
       ${pending.length === 0
         ? '<div class="card empty-state"><strong>검토할 접수가 없습니다</strong>애매한 품목이나 운영 판단이 필요한 접수는 여기에 모입니다.</div>'
         : `<div class="review-grid">${pending.map((shipment) => `<article class="review-card">
@@ -513,7 +511,7 @@
 
   function renderPolicy() {
     const rateRows = policy.RATE_TABLE.map((row) => `<tr><td><strong>${escapeHtml(row.grade)}</strong></td><td>${row.maxSum}cm 이하</td><td>${row.maxWeight}kg 이하</td><td>${formatWon(row.price.일반)}</td><td>${formatWon(row.price.제주)}</td><td>${formatWon(row.price.도서산간)}</td></tr>`).join('');
-    app.innerHTML = `${pageHead('Policy', '데이터 처리 정책', `정책서 ${policy.VERSION} 기준으로 화면에 적용한 규칙입니다.`, '<a class="button primary" href="#/shipments/new">정책대로 접수하기</a>')}
+    app.innerHTML = `${pageHead('Policy', '데이터 처리 정책', `정책서 ${policy.VERSION} 기준으로 화면에 적용한 규칙입니다.`, '<a class="button primary" href="#/">정책대로 접수하기</a>')}
       <section class="policy-grid">
         <article class="policy-layer"><span>1</span><h2>기계적 차단</h2><p>필수값, 숫자 범위, 표준 지점·지역 선택, 확실한 금지 품목을 화면에서 차단합니다.</p></article>
         <article class="policy-layer"><span>2</span><h2>정책 판정</h2><p>부피 무게, 요금 무게, 등급, 권역, 요금과 도착 예정일을 같은 규칙으로 계산합니다.</p></article>
@@ -548,12 +546,12 @@
     setActiveNav(path);
     updateReviewCount();
 
-    if (path === '/') renderDashboard();
-    else if (path === '/shipments/new') renderNewShipment();
-    else if (path === '/shipments') renderShipmentList();
+    if (path === '/') renderShipmentForm();
+    else if (path === '/admin') renderDashboard();
+    else if (path === '/admin/shipments') renderShipmentList();
+    else if (path === '/admin/reviews') renderReviewQueue();
+    else if (path === '/admin/policy') renderPolicy();
     else if (path.startsWith('/shipments/')) renderShipmentDetail(decodeURIComponent(path.slice('/shipments/'.length)));
-    else if (path === '/reviews') renderReviews();
-    else if (path === '/policy') renderPolicy();
     else renderNotFound();
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
