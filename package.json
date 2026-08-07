@@ -4,7 +4,6 @@
   "type": "module",
   "description": "두두택배 데이터 처리 정책을 반영한 접수·검토 화면",
   "dependencies": {
-    "@supabase/supabase-js": "^2.38.0",
-    "@vercel/analytics": "^2.0.1"
+    "@supabase/supabase-js": "^2.38.0"
   }
 }
