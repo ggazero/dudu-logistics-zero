@@ -178,8 +178,24 @@
               <div style="font-size:13px;color:#667085;margin-top:4px;">샘플: RES001, RES002</div>
             </div>
           </section>
+          <section class="form-section">
+            <div class="section-title"><span>2</span><h2>무게와 크기</h2></div>
+            <div class="form-group">
+              <label for="weight">실제 무게 (kg) <span style="color:var(--red);">*</span></label>
+              <input type="number" id="weight" placeholder="예: 3" step="0.1" min="0" style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+            </div>
+            <div class="form-group">
+              <label for="width">가로 × 세로 × 높이 (cm) <span style="color:var(--red);">*</span></label>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                <input type="number" id="width" placeholder="가로" min="0" style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+                <input type="number" id="height" placeholder="세로" min="0" style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+                <input type="number" id="depth" placeholder="높이" min="0" style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+              </div>
+            </div>
+            <div style="margin-top:12px;padding:12px;border-left:3px solid var(--blue-soft);background:var(--blue-soft);border-radius:4px;font-size:13px;color:#667085;">청구 무게와 요금은 입력하지 않습니다. 실제 무게와 부피 무게 중 큰 값으로 자동 계산합니다.</div>
+          </section>
           <div class="button-row">
-            <button type="submit" class="button primary">다음 (예약 정보)</button>
+            <button type="submit" class="button primary">다음 (수령인 정보)</button>
           </div>
         </form>
       </div>
@@ -188,7 +204,25 @@
     document.getElementById('reservationForm').addEventListener('submit', (e) => {
       e.preventDefault();
       const resNo = document.getElementById('reservationNo').value.trim().toUpperCase() || 'RES001';
+      const weight = parseFloat(document.getElementById('weight').value);
+      const width = parseInt(document.getElementById('width').value);
+      const height = parseInt(document.getElementById('height').value);
+      const depth = parseInt(document.getElementById('depth').value);
+
+      if (!weight || weight <= 0 || isNaN(weight)) {
+        showToast('무게를 입력해주세요.');
+        return;
+      }
+      if (!width || !height || !depth || width <= 0 || height <= 0 || depth <= 0) {
+        showToast('가로, 세로, 높이를 모두 입력해주세요.');
+        return;
+      }
+
       sessionStorage.setItem('reservation_no', resNo);
+      sessionStorage.setItem('reserved_weight', weight);
+      sessionStorage.setItem('reserved_width', width);
+      sessionStorage.setItem('reserved_height', height);
+      sessionStorage.setItem('reserved_depth', depth);
       location.hash = `#/shipments/reserved/${encodeURIComponent(resNo)}`;
     });
   }
@@ -262,12 +296,17 @@
 
   function renderReservedForm(reservationNo) {
     const reservation = mockReservations[reservationNo];
+    const savedWeight = parseFloat(sessionStorage.getItem('reserved_weight') || '0');
+    const savedWidth = parseInt(sessionStorage.getItem('reserved_width') || '0');
+    const savedHeight = parseInt(sessionStorage.getItem('reserved_height') || '0');
+    const savedDepth = parseInt(sessionStorage.getItem('reserved_depth') || '0');
+
     if (!reservation) {
       renderNotFound('예약 정보를 찾을 수 없습니다.');
       return;
     }
 
-    app.innerHTML = `${pageHead('Reserved form', '예약택배 - 무게확인', '예약된 기본 정보는 읽기전용이며, 무게만 입력해주세요.', '<a class="button" href="#/">← 처음으로</a>')}
+    app.innerHTML = `${pageHead('Reserved form', '예약택배 - 수령인 정보', '예약된 기본 정보는 읽기전용입니다. 수령인 정보를 입력해주세요.', '<a class="button" href="#/">← 처음으로</a>')}
       <div class="form-layout">
         <form id="reservedWeightForm" class="form-card" novalidate>
           <section class="form-section">
@@ -284,16 +323,6 @@
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label>받는 분</label>
-                <input type="text" value="${escapeHtml(reservation.receiverName)}" readonly style="padding:12px;border:1px solid #dfe4ec;background:#f5f5f5;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
-              </div>
-              <div class="form-group">
-                <label>도착지역</label>
-                <input type="text" value="${escapeHtml(reservation.receiverArea)}" readonly style="padding:12px;border:1px solid #dfe4ec;background:#f5f5f5;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
                 <label>물품명</label>
                 <input type="text" value="${escapeHtml(reservation.itemName)}" readonly style="padding:12px;border:1px solid #dfe4ec;background:#f5f5f5;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
               </div>
@@ -305,10 +334,35 @@
           </section>
 
           <section class="form-section">
-            <div class="section-title"><span>2</span><h2>무게확인</h2></div>
+            <div class="section-title"><span>2</span><h2>무게와 크기</h2></div>
             <div class="form-group">
-              <label for="weight">실제 무게 (kg) <span style="color:red;">*</span></label>
-              <input type="number" id="weight" placeholder="0.5" step="0.1" min="0" required style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+              <label>실제 무게 (kg)</label>
+              <input type="text" value="${savedWeight > 0 ? savedWeight : ''}" readonly style="padding:12px;border:1px solid #dfe4ec;background:#f5f5f5;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+            </div>
+            <div class="form-group">
+              <label>가로 × 세로 × 높이 (cm)</label>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                <input type="text" value="${savedWidth > 0 ? savedWidth : ''}" readonly style="padding:12px;border:1px solid #dfe4ec;background:#f5f5f5;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+                <input type="text" value="${savedHeight > 0 ? savedHeight : ''}" readonly style="padding:12px;border:1px solid #dfe4ec;background:#f5f5f5;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+                <input type="text" value="${savedDepth > 0 ? savedDepth : ''}" readonly style="padding:12px;border:1px solid #dfe4ec;background:#f5f5f5;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+              </div>
+            </div>
+          </section>
+
+          <section class="form-section">
+            <div class="section-title"><span>3</span><h2>수령인 정보</h2></div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="receiverName">받는 분 <span style="color:var(--red);">*</span></label>
+                <input type="text" id="receiverName" placeholder="예: 김철수" style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+              </div>
+              <div class="form-group">
+                <label for="receiverArea">도착지역 <span style="color:var(--red);">*</span></label>
+                <select id="receiverArea" style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+                  <option value="">선택해주세요</option>
+                  ${policy.AREAS.map(area => `<option value="${area}">${area}</option>`).join('')}
+                </select>
+              </div>
             </div>
           </section>
 
@@ -321,12 +375,21 @@
 
     document.getElementById('reservedWeightForm').addEventListener('submit', (e) => {
       e.preventDefault();
-      const weight = parseFloat(document.getElementById('weight').value);
-      if (!weight || weight <= 0) {
-        showToast('무게를 입력해주세요.');
+      const receiverName = document.getElementById('receiverName').value.trim();
+      const receiverArea = document.getElementById('receiverArea').value.trim();
+
+      if (!receiverName) {
+        showToast('받는 분을 입력해주세요.');
         return;
       }
-      sessionStorage.setItem(`reserved_${reservationNo}_weight`, weight);
+      if (!receiverArea) {
+        showToast('도착지역을 선택해주세요.');
+        return;
+      }
+
+      sessionStorage.setItem('reserved_receiver_name', receiverName);
+      sessionStorage.setItem('reserved_receiver_area', receiverArea);
+      sessionStorage.setItem(`reserved_${reservationNo}_weight`, savedWeight);
       location.hash = `#/shipments/reserved/${encodeURIComponent(reservationNo)}/review`;
     });
   }
@@ -334,6 +397,11 @@
   function renderReservedReview(reservationNo) {
     const reservation = mockReservations[reservationNo];
     const weight = parseFloat(sessionStorage.getItem(`reserved_${reservationNo}_weight`) || '0');
+    const width = parseInt(sessionStorage.getItem('reserved_width') || '0');
+    const height = parseInt(sessionStorage.getItem('reserved_height') || '0');
+    const depth = parseInt(sessionStorage.getItem('reserved_depth') || '0');
+    const receiverName = sessionStorage.getItem('reserved_receiver_name') || reservation.receiverName;
+    const receiverArea = sessionStorage.getItem('reserved_receiver_area') || reservation.receiverArea;
 
     if (!reservation || !weight) {
       renderNotFound('정보를 찾을 수 없습니다.');
@@ -348,18 +416,24 @@
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
               <div><strong>예약번호</strong><div style="color:#667085;margin-top:4px;">${escapeHtml(reservation.reservationNo)}</div></div>
               <div><strong>보내는 분</strong><div style="color:#667085;margin-top:4px;">${escapeHtml(reservation.senderName)}</div></div>
-              <div><strong>받는 분</strong><div style="color:#667085;margin-top:4px;">${escapeHtml(reservation.receiverName)}</div></div>
-              <div><strong>도착지역</strong><div style="color:#667085;margin-top:4px;">${escapeHtml(reservation.receiverArea)}</div></div>
               <div><strong>물품명</strong><div style="color:#667085;margin-top:4px;">${escapeHtml(reservation.itemName)}</div></div>
               <div><strong>신고가액</strong><div style="color:#667085;margin-top:4px;">${reservation.declaredValue > 0 ? reservation.declaredValue.toLocaleString() + '원' : '없음'}</div></div>
             </div>
           </section>
 
           <section class="form-section">
-            <div class="section-title"><h2>입력내용</h2></div>
+            <div class="section-title"><h2>무게와 크기</h2></div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
               <div><strong>실제 무게</strong><div style="color:#667085;margin-top:4px;">${weight}kg</div></div>
-              <div><strong>상자크기</strong><div style="color:#667085;margin-top:4px;">${reservation.width}×${reservation.height}×${reservation.depth}cm</div></div>
+              <div><strong>상자크기</strong><div style="color:#667085;margin-top:4px;">${width}×${height}×${depth}cm</div></div>
+            </div>
+          </section>
+
+          <section class="form-section">
+            <div class="section-title"><h2>수령인 정보</h2></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+              <div><strong>받는 분</strong><div style="color:#667085;margin-top:4px;">${escapeHtml(receiverName)}</div></div>
+              <div><strong>도착지역</strong><div style="color:#667085;margin-top:4px;">${escapeHtml(receiverArea)}</div></div>
             </div>
           </section>
 
@@ -379,6 +453,11 @@
   function renderReservedComplete(reservationNo) {
     const reservation = mockReservations[reservationNo];
     const weight = parseFloat(sessionStorage.getItem(`reserved_${reservationNo}_weight`) || '0');
+    const width = parseInt(sessionStorage.getItem('reserved_width') || '0');
+    const height = parseInt(sessionStorage.getItem('reserved_height') || '0');
+    const depth = parseInt(sessionStorage.getItem('reserved_depth') || '0');
+    const receiverName = sessionStorage.getItem('reserved_receiver_name') || reservation.receiverName;
+    const receiverArea = sessionStorage.getItem('reserved_receiver_area') || reservation.receiverArea;
 
     if (!reservation) {
       renderNotFound('정보를 찾을 수 없습니다.');
@@ -397,8 +476,10 @@
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
               <div><strong>예약번호</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${escapeHtml(reservation.reservationNo)}</div></div>
               <div><strong>보내는 분</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${escapeHtml(reservation.senderName)}</div></div>
-              <div><strong>받는 분</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${escapeHtml(reservation.receiverName)}</div></div>
+              <div><strong>받는 분</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${escapeHtml(receiverName)}</div></div>
+              <div><strong>도착지역</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${escapeHtml(receiverArea)}</div></div>
               <div><strong>무게</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${weight}kg</div></div>
+              <div><strong>상자크기</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${width}×${height}×${depth}cm</div></div>
             </div>
             <div style="border-top:1px solid #dfe4ec;padding-top:16px;">
               <div style="font-size:13px;color:#667085;">접수일시: ${new Date().toLocaleString('ko-KR')}</div>
