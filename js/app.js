@@ -89,6 +89,24 @@
     document.getElementById('reviewCount').textContent = String(count);
   }
 
+  function renderNav(path) {
+    const navEl = document.getElementById('mainNav');
+    let html = '';
+
+    if (path === '/') {
+      html = '<a href="#/" data-route="/" class="active">새 접수</a>';
+    } else if (path.startsWith('/admin')) {
+      html = `<a href="#/admin" data-route="/admin" class="active">대시보드</a>
+              <a href="#/admin/shipments" data-route="/admin/shipments">접수 목록</a>
+              <a href="#/admin/reviews" data-route="/admin/reviews">보류 검토 <span id="reviewCount" class="nav-count">0</span></a>
+              <a href="#/admin/policy" data-route="/admin/policy">정책 보기</a>`;
+    } else if (path.startsWith('/shipments/')) {
+      html = '<a href="#/" data-route="/">새 접수</a>';
+    }
+
+    navEl.innerHTML = html;
+  }
+
   function setActiveNav(route) {
     let active = '/';
     if (route === '/') active = '/';
@@ -160,7 +178,7 @@
     const branchOptions = policy.BRANCHES.map((branch) => `<option value="${branch.code}">${escapeHtml(branch.name)} · ${escapeHtml(branch.hub)}</option>`).join('');
     const destinationOptions = policy.DESTINATIONS.map((area) => `<option value="${escapeHtml(area.name)}">${escapeHtml(area.name)} · ${escapeHtml(area.region)}</option>`).join('');
 
-    app.innerHTML = `${pageHead('New shipment', '새 접수', '표준 입력값만 받고 계산값은 직접 수정할 수 없도록 구성했습니다.', '<a class="button" href="#/admin/policy">적용 정책 보기</a>')}
+    app.innerHTML = `${pageHead('New shipment', '새 접수', '표준 입력값만 받고 계산값은 직접 수정할 수 없도록 구성했습니다.', '<div class="button-row" style="gap:8px"><a class="button secondary" href="#/admin/policy">정책 보기</a><a class="button primary" href="#/admin">관리자</a></div>')}
       <div class="notice">현재 버전은 서버가 아닌 이 브라우저의 localStorage에 저장됩니다. 전사 운송장 중복 방지는 DB 연결 단계에서 최종 적용해야 합니다.</div>
       <div class="form-layout">
         <form id="shipmentForm" class="form-card" novalidate>
@@ -543,7 +561,7 @@
   function route() {
     const raw = location.hash.slice(1) || '/';
     const path = raw.split('?')[0];
-    setActiveNav(path);
+    renderNav(path);
     updateReviewCount();
 
     if (path === '/') renderShipmentForm();
