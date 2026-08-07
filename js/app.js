@@ -16,6 +16,14 @@
     route();
   }
 
+  function safeDecodePath(value) {
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return null;
+    }
+  }
+
   function loadShipments() {
     try {
       const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
@@ -50,10 +58,88 @@
       throw new Error('서버에서 운송장 번호를 발급하지 못했습니다.');
     }
 
-    record.trackingNo = result.tracking_no;
-    shipments.push(record);
+    const savedRecord = dbShipmentToApp(result);
+    Object.assign(record, savedRecord);
+    shipments = shipments.filter((item) => item.trackingNo !== savedRecord.trackingNo);
+    shipments.push(savedRecord);
     persist();
-    return record;
+    return savedRecord;
+  }
+
+  function dbShipmentToApp(row) {
+    const rawEnvelope = row.raw_input && typeof row.raw_input === 'object' ? row.raw_input : {};
+    const raw = rawEnvelope.input && typeof rawEnvelope.input === 'object' ? rawEnvelope.input : rawEnvelope;
+    const intake = rawEnvelope.intake && typeof rawEnvelope.intake === 'object'
+      ? rawEnvelope.intake
+      : { type: 'standard', details: {} };
+    const branch = domain.findBranch(row.branch_code || String(row.tracking_no || '').slice(0, 2)) || {
+      code: row.branch_code || '', name: row.branch_name || '미등록 지점', hub: '',
+    };
+    const destination = domain.findDestination(row.receiver_area) || {
+      name: row.receiver_area || '', region: row.normalized_region_type || row.region_type || '',
+    };
+    const previous = shipments.find((item) => item.trackingNo === row.tracking_no);
+
+    return {
+      requestId: row.request_id || '',
+      trackingNo: row.tracking_no,
+      acceptedAt: row.accepted_at || row.created_at,
+      policyVersion: row.policy_version || '이전 정책',
+      status: row.status,
+      statusHistory: previous?.statusHistory || [{
+        status: row.status,
+        changedAt: row.updated_at || row.accepted_at || row.created_at,
+        source: 'Supabase',
+      }],
+      branch,
+      sender: { name: row.sender_name },
+      receiver: { name: row.receiver_name, area: destination.name, region: destination.region },
+      item: { name: row.item_name, declaredValue: Number(row.declared_value || 0) },
+      intake,
+      raw,
+      calculation: {
+        weight: Number(row.weight_kg),
+        width: Number(row.width_cm),
+        height: Number(row.height_cm),
+        depth: Number(row.depth_cm),
+        volumeWeight: Number(row.volume_weight_kg || 0),
+        billedWeight: Number(row.calculated_billed_weight_kg || row.billed_weight_kg),
+        dimensionSum: Number(row.dimension_sum_cm || 0),
+        grade: row.size_grade,
+        region: row.normalized_region_type || row.region_type,
+        price: Number(row.price || 0),
+        etaDate: row.eta_date,
+      },
+      review: {
+        status: row.review_status || 'none',
+        reason: row.review_reason || '',
+        reviewer: row.reviewer || '',
+        note: row.review_note || '',
+        reviewedAt: row.reviewed_at || null,
+      },
+    };
+  }
+
+  async function syncShipmentsFromServer() {
+    const response = await fetch('/api/shipments', { headers: { Accept: 'application/json' } });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !Array.isArray(result)) {
+      throw new Error(result.error || 'Supabase 접수 목록을 불러오지 못했습니다.');
+    }
+    shipments = result.map(dbShipmentToApp);
+    persist();
+    return shipments;
+  }
+
+  async function updateShipmentStatus(trackingNo, status) {
+    const response = await fetch('/api/shipments', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trackingNo, status }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || '배송 상태를 저장하지 못했습니다.');
+    return dbShipmentToApp(result);
   }
 
   function escapeHtml(value) {
@@ -83,7 +169,10 @@
     if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
       return globalThis.crypto.randomUUID();
     }
-    return `request-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
+      const random = Math.floor(Math.random() * 16);
+      return (character === 'x' ? random : (random & 0x3) | 0x8).toString(16);
+    });
   }
 
   function showToast(message) {
@@ -115,7 +204,7 @@
     let html = '';
 
     if (path === '/' || (path === '/shipments/new' && !queryParams.type)) {
-      html = '<a href="/" data-route="/" class="active">새 접수</a>';
+      html = '<a href="/" data-route="/">새 접수</a>';
     } else if ((path === '/shipments/new' && queryParams.type) || path === '/shipments/new/form') {
       const steps = [
         { num: 1, label: '접수정보' },
@@ -134,7 +223,7 @@
       </div>
       <a href="/" style="margin-left:auto;">← 돌아가기</a>`;
     } else if (path.startsWith('/admin')) {
-      html = `<a href="/admin" data-route="/admin" class="active">대시보드</a>
+      html = `<a href="/admin" data-route="/admin">대시보드</a>
               <a href="/admin/shipments" data-route="/admin/shipments">접수 목록</a>
               <a href="/admin/policy" data-route="/admin/policy">정책 보기</a>`;
     } else if (path.startsWith('/shipments/')) {
@@ -142,6 +231,8 @@
     }
 
     navEl.innerHTML = html;
+    setActiveNav(path);
+    document.querySelector('.header-admin-button')?.classList.toggle('active', path.startsWith('/admin'));
   }
 
   function setShipmentProgress(currentStep) {
@@ -185,13 +276,120 @@
   }
 
   function setActiveNav(route) {
-    let active = '/';
-    if (route === '/') active = '/';
+    let active = route;
+    if (route.startsWith('/shipments/')) active = '/';
+    if (route.startsWith('/admin/shipments')) active = '/admin/shipments';
+    else if (route.startsWith('/admin/policy')) active = '/admin/policy';
     else if (route.startsWith('/admin')) active = '/admin';
-    else if (route.startsWith('/shipments/')) active = '/';
     document.querySelectorAll('.main-nav a').forEach((link) => {
       link.classList.toggle('active', link.dataset.route === active);
+      if (link.dataset.route === active) link.setAttribute('aria-current', 'page');
+      else link.removeAttribute('aria-current');
     });
+  }
+
+  function intakeLabel(type) {
+    return ({
+      standard: '일반 접수', reserved: '예약택배', customer: '비회원', member: '회원',
+      shopping: '쇼핑몰', branch: '점간 택배',
+    })[type] || '일반 접수';
+  }
+
+  function intakeForForm(type) {
+    const safeType = ['customer', 'member', 'shopping', 'branch'].includes(type) ? type : 'standard';
+    const details = {
+      customer: { customerPhone: sessionStorage.getItem('customer_phone') || '' },
+      member: { memberNo: sessionStorage.getItem('member_no') || '' },
+      shopping: {
+        shoppingName: sessionStorage.getItem('shopping_name') || '',
+        shoppingNo: sessionStorage.getItem('shopping_no') || '',
+      },
+      branch: { branchNo: sessionStorage.getItem('branch_no') || '' },
+      standard: {},
+    };
+    return { type: safeType, details: details[safeType] };
+  }
+
+  function createShippingLabelDataUrl(shipment) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1200;
+    canvas.height = 720;
+    const context = canvas.getContext('2d');
+    const trackingNo = String(shipment.trackingNo);
+    const line = (x1, y1, x2, y2, width = 3) => {
+      context.lineWidth = width;
+      context.beginPath();
+      context.moveTo(x1, y1);
+      context.lineTo(x2, y2);
+      context.stroke();
+    };
+    const text = (value, x, y, size = 28, weight = 600) => {
+      context.font = `${weight} ${size}px Pretendard, "Noto Sans KR", sans-serif`;
+      context.fillText(String(value), x, y);
+    };
+
+    context.fillStyle = '#fff';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.strokeStyle = '#111';
+    context.fillStyle = '#111';
+    context.lineWidth = 6;
+    context.strokeRect(12, 12, 1176, 696);
+    line(12, 150, 1188, 150);
+    line(12, 255, 1188, 255);
+    line(12, 385, 1188, 385);
+    line(12, 505, 1188, 505);
+    line(700, 12, 700, 385);
+
+    text('두두 x CU 택배', 40, 82, 48, 900);
+    text('실습용 송장 · 실제 운송용 아님', 40, 125, 22, 600);
+    text(`운송장번호  ${trackingNo.slice(0, 4)}-${trackingNo.slice(4, 7)}-${trackingNo.slice(7)}`, 40, 215, 36, 900);
+    text(`${shipment.branch.name}  ${intakeLabel(shipment.intake?.type)}`, 735, 70, 28, 800);
+    text(`도착  ${shipment.receiver.area}`, 735, 125, 46, 900);
+    text(`보내는 사람  ${shipment.sender.name}`, 40, 310, 29, 700);
+    text(`받는 사람  ${shipment.receiver.name}`, 40, 360, 29, 700);
+    text(`상품명  ${shipment.item.name}`, 40, 450, 30, 700);
+    text(`접수일  ${domain.formatDate(shipment.acceptedAt)}`, 700, 450, 28, 700);
+    text(`중량  ${formatNumber(shipment.calculation.weight, 2)}kg`, 40, 575, 42, 900);
+    text(`요금  ${formatWon(shipment.calculation.price)}`, 40, 635, 30, 700);
+
+    let barcodeX = 710;
+    for (const digit of trackingNo) {
+      const value = Number(digit) + 3;
+      for (let index = 0; index < 5; index += 1) {
+        const barWidth = ((value >> index) & 1) === 1 ? 8 : 4;
+        context.fillRect(barcodeX, 545, barWidth, 100);
+        barcodeX += barWidth + 5;
+      }
+    }
+    text(trackingNo, 735, 680, 25, 700);
+    return canvas.toDataURL('image/png');
+  }
+
+  function completionToolsHtml(shipment, labelDataUrl) {
+    return `<section class="completion-tools">
+      <article class="card shipping-label-card">
+        <div class="card-head"><div><h2>송장 이미지</h2><small>화면의 가상 운송장 번호로 만든 실습용 이미지입니다.</small></div></div>
+        <div class="shipping-label-print-area">
+          <img class="shipping-label-image" src="${labelDataUrl}" alt="운송장 ${escapeHtml(shipment.trackingNo)} 이미지">
+        </div>
+        <div class="button-row no-print">
+          <button id="printLabelButton" class="button primary" type="button">송장 출력</button>
+          <a id="downloadLabelButton" class="button" href="${labelDataUrl}" download="dudu-label-${escapeHtml(shipment.trackingNo)}.png">PNG 저장</a>
+        </div>
+      </article>
+      <aside class="card attachment-guide no-print">
+        <div class="card-head"><h2>출력 후 부착 안내</h2></div>
+        <ol class="workflow-list">
+          <li><span class="workflow-number">1</span><div><strong>송장을 선명하게 출력</strong><small>잘리거나 번진 부분이 없는지 확인합니다.</small></div></li>
+          <li><span class="workflow-number">2</span><div><strong>상자에서 가장 넓고 평평한 면에 부착</strong><small>모서리와 상자 이음새는 피합니다.</small></div></li>
+          <li><span class="workflow-number">3</span><div><strong>바코드 부분을 평평하게 유지</strong><small>테이프 주름이나 다른 라벨이 겹치지 않게 합니다.</small></div></li>
+        </ol>
+      </aside>
+    </section>`;
+  }
+
+  function bindCompletionTools() {
+    document.getElementById('printLabelButton')?.addEventListener('click', () => window.print());
   }
 
   function shipmentRows(rows) {
@@ -320,7 +518,17 @@
     `;
   }
 
-  function renderDashboard() {
+  async function renderDashboard() {
+    app.innerHTML = '<div class="card empty-state"><strong>Supabase 접수 데이터를 불러오는 중입니다</strong>잠시만 기다려 주세요.</div>';
+    let syncWarning = '';
+    try {
+      await syncShipmentsFromServer();
+    } catch (error) {
+      console.warn('관리자 데이터 동기화 실패:', error);
+      syncWarning = `<div class="notice error-notice">Supabase 연결에 실패해 브라우저에 저장된 자료를 표시합니다. ${escapeHtml(error.message)}</div>`;
+    }
+    if ((location.pathname.replace(/\/+$/, '') || '/') !== '/admin') return;
+
     const today = domain.formatDate(new Date());
     const todayCount = shipments.filter((shipment) => domain.formatDate(shipment.acceptedAt) === today).length;
     const pendingCount = shipments.filter((shipment) => shipment.review?.status === 'pending').length;
@@ -328,12 +536,12 @@
     const totalPrice = shipments.reduce((sum, shipment) => sum + Number(shipment.calculation.price || 0), 0);
     const recent = [...shipments].sort((a, b) => new Date(b.acceptedAt) - new Date(a.acceptedAt)).slice(0, 5);
 
-    app.innerHTML = `${pageHead('Dashboard', '오늘의 접수 흐름을 한눈에', '정상 접수와 운영 확인이 필요한 건을 분리해 확인합니다.', '<a class="button primary" href="/">+ 새 접수 시작</a>')}
+    app.innerHTML = `${syncWarning}${pageHead('Dashboard', '오늘의 접수 흐름을 한눈에', 'Supabase에 저장된 접수와 배송 상태를 기준으로 표시합니다.', '<a class="button primary" href="/">+ 새 접수 시작</a>')}
       <section class="metric-grid" aria-label="접수 요약">
         <article class="metric-card"><div class="metric-label">오늘 접수</div><div class="metric-value">${todayCount}</div><div class="metric-note">${today}</div></article>
         <article class="metric-card attention"><div class="metric-label">운영 확인 필요</div><div class="metric-value">${pendingCount}</div><div class="metric-note">임의 확정하지 않은 접수</div></article>
         <article class="metric-card"><div class="metric-label">배송 완료</div><div class="metric-value">${deliveredCount}</div><div class="metric-note">표준 상태 기준</div></article>
-        <article class="metric-card"><div class="metric-label">누적 접수 요금</div><div class="metric-value">${formatWon(totalPrice)}</div><div class="metric-note">현재 브라우저 저장 기준</div></article>
+        <article class="metric-card"><div class="metric-label">누적 접수 요금</div><div class="metric-value">${formatWon(totalPrice)}</div><div class="metric-note">Supabase 저장 기준</div></article>
       </section>
       <section class="section-grid">
         <article class="card">
@@ -454,6 +662,10 @@
 
   function renderReservedReview(reservationNo) {
     const reservation = mockReservations[reservationNo];
+    if (!reservation) {
+      renderNotFound('예약 정보를 찾을 수 없습니다. 예약번호를 다시 확인해 주세요.');
+      return;
+    }
     const weight = parseFloat(sessionStorage.getItem(`reserved_${reservationNo}_weight`) || '0');
     const width = parseInt(sessionStorage.getItem('reserved_width') || '0');
     const height = parseInt(sessionStorage.getItem('reserved_height') || '0');
@@ -461,7 +673,7 @@
     const receiverName = sessionStorage.getItem('reserved_receiver_name') || reservation.receiverName;
     const receiverArea = sessionStorage.getItem('reserved_receiver_area') || reservation.receiverArea;
 
-    if (!reservation || !weight) {
+    if (!weight) {
       renderNotFound('정보를 찾을 수 없습니다.');
       return;
     }
@@ -524,6 +736,7 @@
     const { weight, width, height, depth } = shipment.calculation;
     const receiverName = shipment.receiver.name;
 
+    const labelDataUrl = createShippingLabelDataUrl(shipment);
     app.innerHTML = `
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;gap:24px;padding:24px;">
         <div style="text-align:center;">
@@ -546,11 +759,13 @@
             </div>
           </div>
         </article>
+        ${completionToolsHtml(shipment, labelDataUrl)}
         <div class="button-row">
           <a href="/" class="button primary">홈으로 돌아가기</a>
         </div>
       </div>
     `;
+    bindCompletionTools();
   }
 
   function renderCustomerLogin() {
@@ -679,6 +894,7 @@
       return;
     }
 
+    const labelDataUrl = createShippingLabelDataUrl(shipment);
     app.innerHTML = `
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;gap:24px;padding:24px;">
         <div style="text-align:center;">
@@ -709,15 +925,18 @@
             </div>
           </div>
         </article>
+        ${completionToolsHtml(shipment, labelDataUrl)}
         <div class="button-row">
           <a href="/admin/shipments" class="button">접수목록 보기</a>
           <a href="/" class="button primary">홈으로 돌아가기</a>
         </div>
       </div>
     `;
+    bindCompletionTools();
   }
 
   function renderNewShipment(type) {
+    const intake = intakeForForm(type);
     const customerName = sessionStorage.getItem('customer_name') || '';
     const customerPhone = sessionStorage.getItem('customer_phone') || '';
     const memberNo = sessionStorage.getItem('member_no') || '';
@@ -728,9 +947,9 @@
     const destinationOptions = policy.DESTINATIONS.map((area) => `<option value="${escapeHtml(area.name)}">${escapeHtml(area.name)} · ${escapeHtml(area.region)}</option>`).join('');
 
     app.innerHTML = `${pageHead('New shipment', '새 접수', '표준 입력값만 받고 계산값은 직접 수정할 수 없도록 구성했습니다.', '<a class="button secondary" href="/admin/policy">정책 보기</a>')}
-      <div class="notice">현재 버전은 서버가 아닌 이 브라우저의 localStorage에 저장됩니다. 전사 운송장 중복 방지는 DB 연결 단계에서 최종 적용해야 합니다.</div>
+      <div class="notice">${escapeHtml(intakeLabel(intake.type))} 유형으로 접수합니다. 접수 정보는 Supabase 저장 성공 후 완료 처리됩니다.</div>
       <div class="form-layout shipment-layout">
-        <form id="shipmentForm" class="form-card" novalidate>
+        <form id="shipmentForm" class="form-card" data-intake-type="${escapeHtml(intake.type)}" novalidate>
           <section class="form-section">
             <div class="section-title"><span>1</span><h2>접수 기본 정보</h2></div>
             <div class="field-grid">
@@ -746,12 +965,12 @@
               </div>
               <div class="field">
                 <label for="senderName">보내는 분 이름 <b class="required">*</b></label>
-                <input id="senderName" name="senderName" autocomplete="name" maxlength="40" placeholder="예: 김민준" value="${customerName}">
+                <input id="senderName" name="senderName" autocomplete="name" maxlength="40" placeholder="예: 김민준" value="${escapeHtml(customerName)}">
               </div>
-              ${type === 'customer' ? `<div class="field"><label for="senderPhone">휴대전화번호 <b class="required">*</b></label><input id="senderPhone" name="senderPhone" type="tel" readonly value="${customerPhone}" style="background:#f5f5f5;"></div>` : ''}
-              ${type === 'member' ? `<div class="field"><label for="memberNo">회원번호</label><input id="memberNo" type="text" readonly value="${memberNo}" style="background:#f5f5f5;"></div>` : ''}
-              ${type === 'shopping' ? `<div class="field"><label for="shoppingNo">사업자번호</label><input id="shoppingNo" type="text" readonly value="${shoppingNo}" style="background:#f5f5f5;"></div>` : ''}
-              ${type === 'branch' ? `<div class="field"><label for="branchNo">지점 고유번호</label><input id="branchNo" type="text" readonly value="${branchNo}" style="background:#f5f5f5;"></div>` : ''}
+              ${type === 'customer' ? `<div class="field"><label for="senderPhone">휴대전화번호 <b class="required">*</b></label><input id="senderPhone" name="senderPhone" type="tel" readonly value="${escapeHtml(customerPhone)}" style="background:#f5f5f5;"></div>` : ''}
+              ${type === 'member' ? `<div class="field"><label for="memberNo">회원번호</label><input id="memberNo" type="text" readonly value="${escapeHtml(memberNo)}" style="background:#f5f5f5;"></div>` : ''}
+              ${type === 'shopping' ? `<div class="field"><label for="shoppingNo">사업자번호</label><input id="shoppingNo" type="text" readonly value="${escapeHtml(shoppingNo)}" style="background:#f5f5f5;"></div>` : ''}
+              ${type === 'branch' ? `<div class="field"><label for="branchNo">지점 고유번호</label><input id="branchNo" type="text" readonly value="${escapeHtml(branchNo)}" style="background:#f5f5f5;"></div>` : ''}
               <div class="field">
                 <label for="receiverName">받는 분 이름 <b class="required">*</b></label>
                 <input id="receiverName" name="receiverName" maxlength="40" placeholder="예: 이서연">
@@ -985,6 +1204,7 @@
       sender: { name: reservation.senderName },
       receiver: { name: receiverName, area: destination.name, region: destination.region },
       item: { name: reservation.itemName, declaredValue: reservation.declaredValue || 0 },
+      intake: { type: 'reserved', details: { reservationNo } },
       raw: {
         senderName: reservation.senderName,
         receiverName,
@@ -1062,6 +1282,7 @@
       sender: { name: values.senderName },
       receiver: { name: values.receiverName, area: result.destination.name, region: result.destination.region },
       item: { name: values.itemName, declaredValue: domain.nonNegativeNumber(values.declaredValue) },
+      intake: intakeForForm(document.getElementById('shipmentForm')?.dataset.intakeType),
       raw: { ...values },
       calculation: {
         weight: result.calculation.weight,
@@ -1096,7 +1317,17 @@
     showToast('접수가 완료되었습니다.');
   }
 
-  function renderShipmentList() {
+  async function renderShipmentList() {
+    app.innerHTML = '<div class="card empty-state"><strong>Supabase 접수 목록을 불러오는 중입니다</strong>잠시만 기다려 주세요.</div>';
+    let syncWarning = '';
+    try {
+      await syncShipmentsFromServer();
+    } catch (error) {
+      console.warn('접수 목록 동기화 실패:', error);
+      syncWarning = `<div class="notice error-notice">Supabase 연결에 실패해 브라우저 저장 자료를 표시합니다. ${escapeHtml(error.message)}</div>`;
+    }
+    if ((location.pathname.replace(/\/+$/, '') || '/') !== '/admin/shipments') return;
+
     const sorted = [...shipments].sort((a, b) => new Date(b.acceptedAt) - new Date(a.acceptedAt));
     const today = domain.formatDate(new Date());
     const sevenDaysAgo = domain.formatDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
@@ -1151,7 +1382,7 @@
       }
     };
 
-    app.innerHTML = `${pageHead('Shipments', '접수 목록', '날짜와 검색어로 필터링하고 목록을 확인합니다.', '<a class="button primary" href="/">+ 새 접수</a>')}
+    app.innerHTML = `${syncWarning}${pageHead('Shipments', '접수 목록', 'Supabase 접수를 날짜와 검색어로 필터링합니다.', '<a class="button primary" href="/">+ 새 접수</a>')}
       <div class="toolbar">
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
           <div>
@@ -1188,8 +1419,17 @@
     renderList();
   }
 
-  function renderShipmentDetail(trackingNo) {
-    const shipment = shipments.find((item) => item.trackingNo === trackingNo);
+  async function renderShipmentDetail(trackingNo) {
+    let shipment = shipments.find((item) => item.trackingNo === trackingNo);
+    if (!shipment) {
+      app.innerHTML = '<div class="card empty-state"><strong>접수 상세 정보를 불러오는 중입니다</strong>잠시만 기다려 주세요.</div>';
+      try {
+        await syncShipmentsFromServer();
+        shipment = shipments.find((item) => item.trackingNo === trackingNo);
+      } catch (error) {
+        console.warn('접수 상세 동기화 실패:', error);
+      }
+    }
     if (!shipment) {
       renderNotFound('해당 운송장을 찾을 수 없습니다.');
       return;
@@ -1209,6 +1449,7 @@
           <dl class="detail-list">
             <div><dt>접수 일시</dt><dd>${escapeHtml(formatDateTime(shipment.acceptedAt))}</dd></div>
             <div><dt>적용 정책</dt><dd>${escapeHtml(shipment.policyVersion)}</dd></div>
+            <div><dt>접수 유형</dt><dd>${escapeHtml(intakeLabel(shipment.intake?.type))}</dd></div>
             <div><dt>접수 지점</dt><dd>${escapeHtml(shipment.branch.name)} (${escapeHtml(shipment.branch.code)})</dd></div>
             <div><dt>허브</dt><dd>${escapeHtml(shipment.branch.hub)}</dd></div>
             <div><dt>보내는 분</dt><dd>${escapeHtml(shipment.sender.name)}</dd></div>
@@ -1234,19 +1475,31 @@
         </aside>
       </div>`;
 
-    document.getElementById('saveStatus').addEventListener('click', () => {
+    document.getElementById('saveStatus').addEventListener('click', async () => {
       const status = document.getElementById('shipmentStatus').value;
       if (!policy.STANDARD_STATUSES.includes(status)) return;
       if (shipment.status === status) {
         showToast('이미 같은 배송 상태입니다.');
         return;
       }
-      shipment.status = status;
-      shipment.statusUpdatedAt = new Date().toISOString();
-      shipment.statusHistory = shipment.statusHistory || [];
-      shipment.statusHistory.push({ status, changedAt: shipment.statusUpdatedAt, source: '상세 화면 변경' });
-      persist();
-      showToast('표준 배송 상태를 저장했습니다.');
+      const button = document.getElementById('saveStatus');
+      button.disabled = true;
+      button.textContent = '저장 중';
+      try {
+        const saved = await updateShipmentStatus(shipment.trackingNo, status);
+        const changedAt = new Date().toISOString();
+        saved.statusHistory = [...(shipment.statusHistory || []), { status, changedAt, source: 'Supabase 상태 변경' }];
+        shipments = shipments.filter((item) => item.trackingNo !== saved.trackingNo);
+        shipments.push(saved);
+        persist();
+        showToast('배송 상태를 Supabase에 저장했습니다.');
+        renderShipmentDetail(saved.trackingNo);
+      } catch (error) {
+        console.warn('배송 상태 저장 실패:', error);
+        button.disabled = false;
+        button.textContent = '저장';
+        showToast(`배송 상태 저장에 실패했습니다. ${error.message}`);
+      }
     });
   }
 
@@ -1303,17 +1556,27 @@
     }
     else if (path.startsWith('/shipments/reserved/')) {
       const parts = path.slice('/shipments/reserved/'.length).split('/');
-      const reservationNo = decodeURIComponent(parts[0]);
-      if (parts[1] === 'review') renderReservedReview(reservationNo);
+      const reservationNo = safeDecodePath(parts[0]);
+      const subRoute = parts[1] || '';
+      if (!reservationNo || parts.length > 2 || !['', 'review', 'complete'].includes(subRoute)) {
+        renderNotFound('잘못된 예약택배 주소입니다. 예약 접수 화면에서 다시 시작해 주세요.');
+      } else if (subRoute === 'review') renderReservedReview(reservationNo);
       else if (parts[1] === 'complete') renderReservedComplete(reservationNo);
       else renderReservedForm(reservationNo);
     }
     else if (path === '/admin') renderDashboard();
     else if (path === '/admin/shipments') renderShipmentList();
     else if (path === '/admin/policy') renderPolicy();
-    else if (path.startsWith('/shipments/complete/')) renderShipmentComplete(decodeURIComponent(path.slice('/shipments/complete/'.length)));
-    else if (path.startsWith('/shipments/kakaotalk/')) renderShipmentComplete(decodeURIComponent(path.slice('/shipments/kakaotalk/'.length)));
-    else if (path.startsWith('/shipments/')) renderShipmentDetail(decodeURIComponent(path.slice('/shipments/'.length)));
+    else if (path.startsWith('/shipments/complete/')) {
+      const trackingNo = safeDecodePath(path.slice('/shipments/complete/'.length));
+      if (trackingNo) renderShipmentComplete(trackingNo);
+      else renderNotFound();
+    }
+    else if (path.startsWith('/shipments/')) {
+      const trackingNo = safeDecodePath(path.slice('/shipments/'.length));
+      if (trackingNo) renderShipmentDetail(trackingNo);
+      else renderNotFound();
+    }
     else renderNotFound();
     window.scrollTo({ top: 0, behavior: 'auto' });
   }

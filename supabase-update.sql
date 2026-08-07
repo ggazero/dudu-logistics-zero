@@ -200,6 +200,16 @@ create index if not exists shipments_accepted_at_idx on shipments (accepted_at d
 create index if not exists shipments_review_status_idx on shipments (review_status);
 create index if not exists shipments_status_idx on shipments (status);
 
+-- 관리자 실습 화면에서 배송 상태만 갱신할 수 있게 합니다.
+-- 실사용 전에는 로그인 사용자 역할을 확인하는 정책으로 교체해야 합니다.
+drop policy if exists "anon update shipment status" on shipments;
+revoke update on shipments from anon;
+grant update (status, normalized_status) on shipments to anon;
+create policy "anon update shipment status" on shipments
+  for update to anon
+  using (true)
+  with check (status in ('집화처리', '간선상차', '간선하차', '배송출발', '배송완료', '미배송', '반품'));
+
 -- 5. 배송 상태가 바뀔 때마다 이전 상태와 새 상태를 따로 남깁니다.
 create table if not exists shipment_status_history (
   id bigint generated always as identity primary key,

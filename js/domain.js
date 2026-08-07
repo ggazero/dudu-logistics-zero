@@ -129,22 +129,6 @@
     return `${year}-${month}-${day}`;
   }
 
-  function nextTrackingNo(branchCode, shipments) {
-    const suffixes = shipments
-      .map((shipment) => shipment.trackingNo)
-      .filter((trackingNo) => String(trackingNo).startsWith(branchCode))
-      .map((trackingNo) => Number(String(trackingNo).slice(2)))
-      .filter(Number.isFinite);
-    let next = suffixes.length > 0 ? Math.max(...suffixes) + 1 : 1;
-    let candidate = branchCode + String(next).padStart(8, '0');
-    const issued = new Set(shipments.map((shipment) => shipment.trackingNo));
-    while (issued.has(candidate)) {
-      next += 1;
-      candidate = branchCode + String(next).padStart(8, '0');
-    }
-    return candidate;
-  }
-
   global.DuduDomain = Object.freeze({
     positiveNumber,
     nonNegativeNumber,
@@ -154,6 +138,5 @@
     calculate,
     addBusinessDays,
     formatDate,
-    nextTrackingNo,
   });
 })(globalThis);

@@ -176,6 +176,7 @@ a { color: inherit; }
   color: #35123f !important;
 }
 .header-admin-button:hover { background: #51df5b !important; }
+.header-admin-button.active { box-shadow: 0 0 0 3px rgba(255,255,255,.28); }
 
 .app-main {
   width: min(1240px, calc(100% - 40px));
@@ -389,6 +390,21 @@ h2 { letter-spacing: -0.025em; }
 .rate-table th, .rate-table td { padding: 11px; border: 1px solid var(--line); text-align: center; font-size: 12px; }
 .rate-table th { background: var(--surface-soft); }
 .notice { margin-bottom: 18px; padding: 13px 15px; border: 1px solid #dbc2e4; border-radius: 11px; background: var(--blue-soft); color: #5c2a6d; font-size: 12.5px; }
+.error-notice { border-color: #f0b8bd; background: var(--red-soft); color: #9f2934; }
+
+.completion-tools {
+  width: min(1000px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(260px, .6fr);
+  gap: 18px;
+  align-items: start;
+}
+.shipping-label-card { min-width: 0; }
+.shipping-label-card .card-head small { display: block; margin-top: 4px; color: var(--muted); }
+.shipping-label-print-area { overflow: hidden; border: 1px solid #cfd6e1; border-radius: 10px; background: #fff; }
+.shipping-label-image { display: block; width: 100%; height: auto; }
+.shipping-label-card .button-row { margin-top: 16px; }
+.attachment-guide { height: 100%; }
 
 .intake-shell {
   display: flex;
@@ -465,8 +481,21 @@ h2 { letter-spacing: -0.025em; }
   .main-nav { margin-left: auto; overflow-x: auto; }
   .main-nav a { padding: 0 9px; }
   .metric-grid { grid-template-columns: repeat(2, 1fr); }
-  .form-layout.shipment-layout, .detail-grid { grid-template-columns: 1fr; }
+  .form-layout.shipment-layout, .detail-grid, .completion-tools { grid-template-columns: 1fr; }
   .preview-card { position: static; }
+}
+
+@media print {
+  body { background: #fff; }
+  body * { visibility: hidden !important; }
+  .shipping-label-print-area, .shipping-label-print-area * { visibility: visible !important; }
+  .shipping-label-print-area {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    border: 0;
+  }
+  .shipping-label-image { width: 100%; max-height: 100vh; object-fit: contain; }
 }
 
 @media (max-width: 720px) {
