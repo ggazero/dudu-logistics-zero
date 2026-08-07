@@ -1165,7 +1165,7 @@
       }
     };
 
-    app.innerHTML = `${pageHead('Shipments', '접수 목록', '날짜와 검색어로 필터링하고 목록을 확인합니다.', '<a class="button primary" href="#/">+ 새 접수</a>')}
+    app.innerHTML = `${pageHead('Shipments', '접수 목록', '날짜와 검색어로 필터링하고 목록을 확인합니다.', '<a class="button primary" href="/">+ 새 접수</a>')}
       <div class="toolbar">
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
           <div>
@@ -1210,12 +1210,12 @@
     }
     const statusOptions = policy.STANDARD_STATUSES.map((status) => `<option value="${escapeHtml(status)}" ${status === shipment.status ? 'selected' : ''}>${escapeHtml(status)}</option>`).join('');
     const reviewBlock = shipment.review?.status === 'pending'
-      ? `<div class="result-state review"><strong>운영 확인 필요</strong>${escapeHtml(shipment.review.reason)}<br><a href="#/admin/reviews">보류 검토 화면에서 처리하기 →</a></div>`
+      ? `<div class="result-state review"><strong>운영 확인 필요</strong>${escapeHtml(shipment.review.reason)}<br><a href="/admin/reviews">보류 검토 화면에서 처리하기 →</a></div>`
       : shipment.review?.status === 'resolved'
         ? `<div class="result-state success"><strong>검토 완료 · ${escapeHtml(shipment.review.reviewer || '담당자 미기록')}</strong>${escapeHtml(shipment.review.note)}</div>`
         : '<div class="result-state success"><strong>정상 접수</strong>자동 차단 및 계산 규칙을 통과했습니다.</div>';
 
-    app.innerHTML = `${pageHead('Shipment detail', '접수 상세', '입력 원본과 정책에 따라 계산된 값을 함께 확인합니다.', '<div class="button-row"><a class="button" href="#/admin/shipments">← 목록</a><a class="button primary" href="#/">+ 새 접수</a></div>')}
+    app.innerHTML = `${pageHead('Shipment detail', '접수 상세', '입력 원본과 정책에 따라 계산된 값을 함께 확인합니다.', '<div class="button-row"><a class="button" href="/admin/shipments">← 목록</a><a class="button primary" href="/">+ 새 접수</a></div>')}
       <div class="detail-grid">
         <section class="card">
           <div class="tracking-number"><small>운송장 번호</small><strong>${escapeHtml(shipment.trackingNo)}</strong></div>
@@ -1266,12 +1266,12 @@
 
   function renderReviews() {
     const pending = shipments.filter((shipment) => shipment.review?.status === 'pending');
-    app.innerHTML = `${pageHead('Review queue', '보류 검토', '자료만으로 확정할 수 없는 접수를 삭제하거나 덮어쓰지 않고 운영자가 확인합니다.', '<a class="button" href="#/admin/policy">판정 정책 보기</a>')}
+    app.innerHTML = `${pageHead('Review queue', '보류 검토', '자료만으로 확정할 수 없는 접수를 삭제하거나 덮어쓰지 않고 운영자가 확인합니다.', '<a class="button" href="/admin/policy">판정 정책 보기</a>')}
       ${pending.length === 0
         ? '<div class="card empty-state"><strong>검토할 접수가 없습니다</strong>애매한 품목이나 운영 판단이 필요한 접수는 여기에 모입니다.</div>'
         : `<div class="review-grid">${pending.map((shipment) => `<article class="review-card">
             <span class="badge review">보류</span>
-            <h2><a class="tracking-link" href="#/shipments/${encodeURIComponent(shipment.trackingNo)}">${escapeHtml(shipment.trackingNo)}</a></h2>
+            <h2><a class="tracking-link" href="/shipments/${encodeURIComponent(shipment.trackingNo)}">${escapeHtml(shipment.trackingNo)}</a></h2>
             <p>${escapeHtml(shipment.review.reason)}</p>
             <div class="review-meta">
               <div><small>물품 원본</small><strong>${escapeHtml(shipment.raw.itemName)}</strong></div>
@@ -1307,7 +1307,7 @@
 
   function renderPolicy() {
     const rateRows = policy.RATE_TABLE.map((row) => `<tr><td><strong>${escapeHtml(row.grade)}</strong></td><td>${row.maxSum}cm 이하</td><td>${row.maxWeight}kg 이하</td><td>${formatWon(row.price.일반)}</td><td>${formatWon(row.price.제주)}</td><td>${formatWon(row.price.도서산간)}</td></tr>`).join('');
-    app.innerHTML = `${pageHead('Policy', '데이터 처리 정책', `정책서 ${policy.VERSION} 기준으로 화면에 적용한 규칙입니다.`, '<a class="button primary" href="#/">정책대로 접수하기</a>')}
+    app.innerHTML = `${pageHead('Policy', '데이터 처리 정책', `정책서 ${policy.VERSION} 기준으로 화면에 적용한 규칙입니다.`, '<a class="button primary" href="/">정책대로 접수하기</a>')}
       <section class="policy-grid">
         <article class="policy-layer"><span>1</span><h2>기계적 차단</h2><p>필수값, 숫자 범위, 표준 지점·지역 선택, 확실한 금지 품목을 화면에서 차단합니다.</p></article>
         <article class="policy-layer"><span>2</span><h2>정책 판정</h2><p>부피 무게, 요금 무게, 등급, 권역, 요금과 도착 예정일을 같은 규칙으로 계산합니다.</p></article>
@@ -1333,13 +1333,12 @@
   }
 
   function renderNotFound(message = '요청한 페이지를 찾을 수 없습니다.') {
-    app.innerHTML = `<div class="card empty-state"><strong>${escapeHtml(message)}</strong><a class="button primary" href="#/" style="margin-top:14px">대시보드로 이동</a></div>`;
+    app.innerHTML = `<div class="card empty-state"><strong>${escapeHtml(message)}</strong><a class="button primary" href="/" style="margin-top:14px">대시보드로 이동</a></div>`;
   }
 
   function route() {
-    const raw = location.hash.slice(1) || '/';
-    const [path, queryString] = raw.split('?');
-    const params = new URLSearchParams(queryString || '');
+    const path = location.pathname.replace(/\/+$/, '') || '/';
+    const params = new URLSearchParams(location.search);
     const queryParams = Object.fromEntries(params);
     renderNav(path, queryParams);
     updateReviewCount();
@@ -1375,6 +1374,26 @@
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
-  window.addEventListener('hashchange', route);
+  document.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href]');
+    if (!link) return;
+
+    const href = link.getAttribute('href');
+    if (event.defaultPrevented || event.button !== 0 || !href || href.startsWith('#')
+      || link.target === '_blank' || link.hasAttribute('download')
+      || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+    const url = new URL(link.href, location.href);
+    if (url.origin !== location.origin) return;
+
+    event.preventDefault();
+    navigate(`${url.pathname}${url.search}`);
+  });
+
+  if (location.hash.startsWith('#/')) {
+    history.replaceState({}, '', location.hash.slice(1));
+  }
+
+  window.addEventListener('popstate', route);
   route();
 })();
