@@ -35,6 +35,27 @@
     }
   }
 
+  async function saveShipment(record) {
+    const response = await fetch('/api/shipments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(record),
+    });
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(result.error || '접수 정보를 저장하지 못했습니다.');
+    }
+    if (!result.tracking_no) {
+      throw new Error('서버에서 운송장 번호를 발급하지 못했습니다.');
+    }
+
+    record.trackingNo = result.tracking_no;
+    shipments.push(record);
+    persist();
+    return record;
+  }
+
   function escapeHtml(value) {
     return String(value ?? '')
       .replaceAll('&', '&amp;')
@@ -488,18 +509,20 @@
 
   function renderReservedComplete(reservationNo) {
     const reservation = mockReservations[reservationNo];
-    const weight = parseFloat(sessionStorage.getItem(`reserved_${reservationNo}_weight`) || '0');
-    const width = parseInt(sessionStorage.getItem('reserved_width') || '0');
-    const height = parseInt(sessionStorage.getItem('reserved_height') || '0');
-    const depth = parseInt(sessionStorage.getItem('reserved_depth') || '0');
-    const receiverName = sessionStorage.getItem('reserved_receiver_name') || reservation.receiverName;
-    const receiverArea = sessionStorage.getItem('reserved_receiver_area') || reservation.receiverArea;
-    const trackingNo = sessionStorage.getItem('reserved_tracking_no') || '';
-
     if (!reservation) {
       renderNotFound('정보를 찾을 수 없습니다.');
       return;
     }
+
+    const trackingNo = sessionStorage.getItem('reserved_tracking_no') || '';
+    const shipment = shipments.find((item) => item.trackingNo === trackingNo);
+    if (!shipment) {
+      renderNotFound('저장된 예약택배 접수 정보를 찾을 수 없습니다.');
+      return;
+    }
+
+    const { weight, width, height, depth } = shipment.calculation;
+    const receiverName = shipment.receiver.name;
 
     app.innerHTML = `
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;gap:24px;padding:24px;">
@@ -649,7 +672,7 @@
     });
   }
 
-  function renderKakaoTalkSent(trackingNo) {
+  function renderShipmentComplete(trackingNo) {
     const shipment = shipments.find((item) => item.trackingNo === trackingNo);
     if (!shipment) {
       renderNotFound('접수 정보를 찾을 수 없습니다.');
@@ -660,12 +683,12 @@
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;gap:24px;padding:24px;">
         <div style="text-align:center;">
           <div style="font-size:64px;margin-bottom:16px;">✓</div>
-          <h1 style="font-size:32px;margin:0;color:#172033;">카카오톡 전송 완료</h1>
-          <p style="font-size:16px;color:#667085;margin:8px 0 0 0;">접수 내용이 카카오톡으로 전송되었습니다.</p>
+          <h1 style="font-size:32px;margin:0;color:#172033;">접수 완료</h1>
+          <p style="font-size:16px;color:#667085;margin:8px 0 0 0;">접수 정보가 정상적으로 저장되었습니다.</p>
         </div>
         <article class="card" style="max-width:600px;width:100%;">
           <div style="padding:24px;border-bottom:1px solid #dfe4ec;">
-            <div style="font-size:13px;color:#667085;margin-bottom:16px;">📱 카카오톡 메시지 내용</div>
+            <div style="font-size:13px;color:#667085;margin-bottom:16px;">📱 카카오톡 테스트 메시지 미리보기 · 실제 전송되지 않음</div>
             <div style="background:#f6eef9;padding:16px;border-radius:8px;border-left:4px solid var(--blue);">
               <div style="font-weight:600;margin-bottom:8px;">두두 x CU 택배 접수 완료</div>
               <div style="font-size:14px;line-height:1.6;color:#333;">
@@ -937,13 +960,6 @@
       return;
     }
 
-    const trackingNo = domain.nextTrackingNo(branch.code, shipments);
-    if (shipments.some((shipment) => shipment.trackingNo === trackingNo)) {
-      submitting = false;
-      showToast('운송장 중복을 발견했습니다. 다시 시도해 주세요.');
-      return;
-    }
-
     const calculation = domain.calculate({
       weight,
       width,
@@ -960,7 +976,7 @@
     const eta = domain.addBusinessDays(acceptedAt, policy.ETA_BUSINESS_DAYS[calculation.region]);
     const record = {
       requestId: makeId(),
-      trackingNo,
+      trackingNo: '',
       acceptedAt: acceptedAt.toISOString(),
       policyVersion: policy.VERSION,
       status: '집화처리',
@@ -997,27 +1013,19 @@
       review: { status: 'none', reason: '', reviewer: '', note: '', reviewedAt: null },
     };
 
-    shipments.push(record);
-    persist();
-
     try {
-      const res = await fetch('/api/shipments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(record),
-      });
-      if (!res.ok) {
-        const error = await res.json();
-        console.warn('Supabase 저장 실패:', error);
-      }
-    } catch (err) {
-      console.warn('Supabase 저장 요청 실패:', err);
+      await saveShipment(record);
+    } catch (error) {
+      submitting = false;
+      console.warn('Supabase 저장 실패:', error);
+      showToast(`접수 저장에 실패했습니다. ${error.message}`);
+      return;
     }
 
     submitting = false;
-    sessionStorage.setItem('reserved_tracking_no', trackingNo);
+    sessionStorage.setItem('reserved_tracking_no', record.trackingNo);
     sessionStorage.removeItem('reservation_no');
-    sessionStorage.removeItem('reserved_weight');
+    sessionStorage.removeItem(`reserved_${reservationNo}_weight`);
     sessionStorage.removeItem('reserved_width');
     sessionStorage.removeItem('reserved_height');
     sessionStorage.removeItem('reserved_depth');
@@ -1041,17 +1049,11 @@
     submitting = true;
     updatePreview();
     const acceptedAt = new Date();
-    const trackingNo = domain.nextTrackingNo(result.branch.code, shipments);
-    if (shipments.some((shipment) => shipment.trackingNo === trackingNo)) {
-      submitting = false;
-      showToast('운송장 중복을 발견했습니다. 다시 시도해 주세요.');
-      return;
-    }
     const eta = domain.addBusinessDays(acceptedAt, policy.ETA_BUSINESS_DAYS[result.calculation.region]);
     const isReview = result.itemDecision.outcome === 'review';
     const record = {
       requestId: makeId(),
-      trackingNo,
+      trackingNo: '',
       acceptedAt: acceptedAt.toISOString(),
       policyVersion: policy.VERSION,
       status: '집화처리',
@@ -1079,26 +1081,19 @@
         : { status: 'none', reason: '', reviewer: '', note: '', reviewedAt: null },
     };
 
-    shipments.push(record);
-    persist();
-
     try {
-      const res = await fetch('/api/shipments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(record),
-      });
-      if (!res.ok) {
-        const error = await res.json();
-        console.warn('Supabase 저장 실패:', error);
-      }
-    } catch (err) {
-      console.warn('Supabase 저장 요청 실패:', err);
+      await saveShipment(record);
+    } catch (error) {
+      submitting = false;
+      updatePreview();
+      console.warn('Supabase 저장 실패:', error);
+      showToast(`접수 저장에 실패했습니다. ${error.message}`);
+      return;
     }
 
     submitting = false;
-    navigate(`/shipments/kakaotalk/${encodeURIComponent(trackingNo)}`);
-    showToast('접수가 완료되었습니다. 카카오톡으로 내용이 전송되었습니다.');
+    navigate(`/shipments/complete/${encodeURIComponent(record.trackingNo)}`);
+    showToast('접수가 완료되었습니다.');
   }
 
   function renderShipmentList() {
@@ -1316,7 +1311,8 @@
     else if (path === '/admin') renderDashboard();
     else if (path === '/admin/shipments') renderShipmentList();
     else if (path === '/admin/policy') renderPolicy();
-    else if (path.startsWith('/shipments/kakaotalk/')) renderKakaoTalkSent(decodeURIComponent(path.slice('/shipments/kakaotalk/'.length)));
+    else if (path.startsWith('/shipments/complete/')) renderShipmentComplete(decodeURIComponent(path.slice('/shipments/complete/'.length)));
+    else if (path.startsWith('/shipments/kakaotalk/')) renderShipmentComplete(decodeURIComponent(path.slice('/shipments/kakaotalk/'.length)));
     else if (path.startsWith('/shipments/')) renderShipmentDetail(decodeURIComponent(path.slice('/shipments/'.length)));
     else renderNotFound();
     window.scrollTo({ top: 0, behavior: 'auto' });
