@@ -156,6 +156,11 @@ a { color: inherit; }
   background: #41d69b;
   box-shadow: 0 0 0 4px rgba(65,214,155,0.12);
 }
+.header-admin-button {
+  min-height: 38px;
+  padding: 0 15px;
+  font-size: 13px;
+}
 
 .app-main {
   width: min(1240px, calc(100% - 40px));
