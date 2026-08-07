@@ -94,7 +94,7 @@
     const navEl = document.getElementById('mainNav');
     let html = '';
 
-    if (path === '/' || path === '/shipments/new') {
+    if (path === '/' || path === '/shipments/new' || path.startsWith('/shipments/reserved')) {
       html = '<a href="#/" data-route="/" class="active">새 접수</a>';
     } else if (path.startsWith('/admin')) {
       html = `<a href="#/admin" data-route="/admin" class="active">대시보드</a>
@@ -141,6 +141,43 @@
         <tbody id="shipmentRows">${shipmentRows(rows)}</tbody>
       </table>
     </div>`;
+  }
+
+  // Sample reserved booking data (in real app, would come from API/Supabase)
+  const mockReservations = {
+    'RES001': { reservationNo: 'RES001', senderName: '김하늘', senderPhone: '010-1234-5678', receiverName: '이준서', receiverArea: '서울', itemName: '이불', width: 60, height: 40, depth: 50, declaredValue: 0 },
+    'RES002': { reservationNo: 'RES002', senderName: '박서연', senderPhone: '010-2345-6789', receiverName: '최민준', receiverArea: '용산', itemName: '책', width: 30, height: 20, depth: 20, declaredValue: 50000 },
+  };
+
+  function renderReservedIntake() {
+    app.innerHTML = `${pageHead('Reserved booking', '예약택배 접수', '사전 예약 시 발급받은 예약번호를 입력하세요.', '<a class="button" href="#/">← 돌아가기</a>')}
+      <div class="form-layout">
+        <form id="reservationForm" class="form-card" novalidate>
+          <section class="form-section">
+            <div class="section-title"><span>1</span><h2>예약번호 입력</h2></div>
+            <div class="form-group">
+              <label for="reservationNo">예약번호</label>
+              <input type="text" id="reservationNo" placeholder="예: RES001" required style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+              <div style="font-size:13px;color:#667085;margin-top:4px;">샘플: RES001, RES002</div>
+            </div>
+          </section>
+          <div class="button-row">
+            <button type="submit" class="button primary">예약 정보 조회</button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    document.getElementById('reservationForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const resNo = document.getElementById('reservationNo').value.trim().toUpperCase();
+      const reservation = mockReservations[resNo];
+      if (!reservation) {
+        showToast('예약번호를 찾을 수 없습니다.');
+        return;
+      }
+      location.hash = `#/shipments/reserved/${encodeURIComponent(resNo)}`;
+    });
   }
 
   function renderHome() {
@@ -208,6 +245,158 @@
           </ol>
         </aside>
       </section>`;
+  }
+
+  function renderReservedForm(reservationNo) {
+    const reservation = mockReservations[reservationNo];
+    if (!reservation) {
+      renderNotFound('예약 정보를 찾을 수 없습니다.');
+      return;
+    }
+
+    app.innerHTML = `${pageHead('Reserved form', '예약택배 - 무게확인', '예약된 기본 정보는 읽기전용이며, 무게만 입력해주세요.', '<a class="button" href="#/">← 처음으로</a>')}
+      <div class="form-layout">
+        <form id="reservedWeightForm" class="form-card" novalidate>
+          <section class="form-section">
+            <div class="section-title"><span>1</span><h2>기본 정보 (예약정보)</h2></div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>예약번호</label>
+                <input type="text" value="${escapeHtml(reservation.reservationNo)}" readonly style="padding:12px;border:1px solid #dfe4ec;background:#f5f5f5;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+              </div>
+              <div class="form-group">
+                <label>보내는 분</label>
+                <input type="text" value="${escapeHtml(reservation.senderName)}" readonly style="padding:12px;border:1px solid #dfe4ec;background:#f5f5f5;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>받는 분</label>
+                <input type="text" value="${escapeHtml(reservation.receiverName)}" readonly style="padding:12px;border:1px solid #dfe4ec;background:#f5f5f5;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+              </div>
+              <div class="form-group">
+                <label>도착지역</label>
+                <input type="text" value="${escapeHtml(reservation.receiverArea)}" readonly style="padding:12px;border:1px solid #dfe4ec;background:#f5f5f5;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>물품명</label>
+                <input type="text" value="${escapeHtml(reservation.itemName)}" readonly style="padding:12px;border:1px solid #dfe4ec;background:#f5f5f5;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+              </div>
+              <div class="form-group">
+                <label>신고가액</label>
+                <input type="text" value="${reservation.declaredValue > 0 ? reservation.declaredValue.toLocaleString() + '원' : '없음'}" readonly style="padding:12px;border:1px solid #dfe4ec;background:#f5f5f5;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+              </div>
+            </div>
+          </section>
+
+          <section class="form-section">
+            <div class="section-title"><span>2</span><h2>무게확인</h2></div>
+            <div class="form-group">
+              <label for="weight">실제 무게 (kg) <span style="color:red;">*</span></label>
+              <input type="number" id="weight" placeholder="0.5" step="0.1" min="0" required style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+            </div>
+          </section>
+
+          <div class="button-row">
+            <button type="submit" class="button primary">다음 (내용확인)</button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    document.getElementById('reservedWeightForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const weight = parseFloat(document.getElementById('weight').value);
+      if (!weight || weight <= 0) {
+        showToast('무게를 입력해주세요.');
+        return;
+      }
+      sessionStorage.setItem(`reserved_${reservationNo}_weight`, weight);
+      location.hash = `#/shipments/reserved/${encodeURIComponent(reservationNo)}/review`;
+    });
+  }
+
+  function renderReservedReview(reservationNo) {
+    const reservation = mockReservations[reservationNo];
+    const weight = parseFloat(sessionStorage.getItem(`reserved_${reservationNo}_weight`) || '0');
+
+    if (!reservation || !weight) {
+      renderNotFound('정보를 찾을 수 없습니다.');
+      return;
+    }
+
+    app.innerHTML = `${pageHead('Reserved review', '예약택배 - 내용확인', '입력하신 내용을 확인하고 접수를 완료해주세요.', '<a class="button" href="#/shipments/reserved/' + encodeURIComponent(reservationNo) + '">← 돌아가기</a>')}
+      <div class="form-layout">
+        <article class="form-card">
+          <section class="form-section">
+            <div class="section-title"><h2>예약정보</h2></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+              <div><strong>예약번호</strong><div style="color:#667085;margin-top:4px;">${escapeHtml(reservation.reservationNo)}</div></div>
+              <div><strong>보내는 분</strong><div style="color:#667085;margin-top:4px;">${escapeHtml(reservation.senderName)}</div></div>
+              <div><strong>받는 분</strong><div style="color:#667085;margin-top:4px;">${escapeHtml(reservation.receiverName)}</div></div>
+              <div><strong>도착지역</strong><div style="color:#667085;margin-top:4px;">${escapeHtml(reservation.receiverArea)}</div></div>
+              <div><strong>물품명</strong><div style="color:#667085;margin-top:4px;">${escapeHtml(reservation.itemName)}</div></div>
+              <div><strong>신고가액</strong><div style="color:#667085;margin-top:4px;">${reservation.declaredValue > 0 ? reservation.declaredValue.toLocaleString() + '원' : '없음'}</div></div>
+            </div>
+          </section>
+
+          <section class="form-section">
+            <div class="section-title"><h2>입력내용</h2></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+              <div><strong>실제 무게</strong><div style="color:#667085;margin-top:4px;">${weight}kg</div></div>
+              <div><strong>상자크기</strong><div style="color:#667085;margin-top:4px;">${reservation.width}×${reservation.height}×${reservation.depth}cm</div></div>
+            </div>
+          </section>
+
+          <div class="button-row">
+            <button id="completeBtn" class="button primary" style="cursor:pointer;">접수 완료</button>
+          </div>
+        </article>
+      </div>
+    `;
+
+    document.getElementById('completeBtn').addEventListener('click', () => {
+      sessionStorage.setItem(`reserved_${reservationNo}_completed`, 'true');
+      location.hash = `#/shipments/reserved/${encodeURIComponent(reservationNo)}/complete`;
+    });
+  }
+
+  function renderReservedComplete(reservationNo) {
+    const reservation = mockReservations[reservationNo];
+    const weight = parseFloat(sessionStorage.getItem(`reserved_${reservationNo}_weight`) || '0');
+
+    if (!reservation) {
+      renderNotFound('정보를 찾을 수 없습니다.');
+      return;
+    }
+
+    app.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;gap:24px;padding:24px;">
+        <div style="text-align:center;">
+          <div style="font-size:64px;margin-bottom:16px;">✓</div>
+          <h1 style="font-size:32px;margin:0;color:#172033;">접수 완료</h1>
+          <p style="font-size:16px;color:#667085;margin:8px 0 0 0;">예약택배 접수가 완료되었습니다.</p>
+        </div>
+        <article class="card" style="max-width:600px;width:100%;">
+          <div style="padding:24px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+              <div><strong>예약번호</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${escapeHtml(reservation.reservationNo)}</div></div>
+              <div><strong>보내는 분</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${escapeHtml(reservation.senderName)}</div></div>
+              <div><strong>받는 분</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${escapeHtml(reservation.receiverName)}</div></div>
+              <div><strong>무게</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${weight}kg</div></div>
+            </div>
+            <div style="border-top:1px solid #dfe4ec;padding-top:16px;">
+              <div style="font-size:13px;color:#667085;">접수일시: ${new Date().toLocaleString('ko-KR')}</div>
+            </div>
+          </div>
+        </article>
+        <div class="button-row">
+          <a href="#/" class="button primary">홈으로 돌아가기</a>
+        </div>
+      </div>
+    `;
   }
 
   function renderNewShipment() {
@@ -601,7 +790,18 @@
     updateReviewCount();
 
     if (path === '/') renderHome();
-    else if (path === '/shipments/new') renderNewShipment();
+    else if (path === '/shipments/new') {
+      const params = new URLSearchParams(location.search);
+      if (params.get('type') === 'reserved') renderReservedIntake();
+      else renderNewShipment();
+    }
+    else if (path.startsWith('/shipments/reserved/')) {
+      const parts = path.slice('/shipments/reserved/'.length).split('/');
+      const reservationNo = decodeURIComponent(parts[0]);
+      if (parts[1] === 'review') renderReservedReview(reservationNo);
+      else if (parts[1] === 'complete') renderReservedComplete(reservationNo);
+      else renderReservedForm(reservationNo);
+    }
     else if (path === '/admin') renderDashboard();
     else if (path === '/admin/shipments') renderShipmentList();
     else if (path === '/admin/reviews') renderReviews();
