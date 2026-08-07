@@ -79,7 +79,7 @@ a { color: inherit; }
 .brand strong, .brand small { display: block; }
 .brand strong { font-size: 15px; letter-spacing: -0.02em; }
 .brand small { color: #aebbd0; font-size: 11px; }
-.main-nav { display: flex; align-self: stretch; gap: 4px; }
+.main-nav { display: flex; align-self: stretch; gap: 4px; align-items: center; }
 .main-nav a {
   display: inline-flex;
   align-items: center;
@@ -95,6 +95,39 @@ a { color: inherit; }
   color: #fff;
   background: rgba(255,255,255,0.05);
   border-bottom-color: #6fa0ff;
+}
+.process-steps {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+.step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #667085;
+  font-size: 12px;
+}
+.step.active {
+  color: #fff;
+}
+.step-number {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #444;
+  font-weight: 700;
+  font-size: 11px;
+}
+.step.active .step-number {
+  background: var(--blue);
+  color: #fff;
+}
+.step-label {
+  font-weight: 600;
 }
 .nav-count {
   min-width: 20px;

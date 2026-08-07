@@ -90,15 +90,29 @@
     if (reviewCountEl) reviewCountEl.textContent = String(count);
   }
 
-  function renderNav(path) {
+  function renderNav(path, queryParams = {}) {
     const navEl = document.getElementById('mainNav');
     let html = '';
 
-    if (path === '/' || path === '/shipments/new') {
+    if (path === '/' || (path === '/shipments/new' && !queryParams.type)) {
       html = '<a href="#/" data-route="/" class="active">새 접수</a>';
-    } else if (path === '/shipments/new/form' || path.startsWith('/shipments/reserved')) {
-      html = `<span style="color:#667085;font-size:13px;">📝 접수 진행중</span>
-              <a href="#/" data-route="/" style="margin-left:auto;">← 돌아가기</a>`;
+    } else if ((path === '/shipments/new' && queryParams.type) || path === '/shipments/new/form') {
+      const steps = [
+        { num: 1, label: '정보입력', active: path === '/shipments/new' && queryParams.type },
+        { num: 2, label: '물품정보', active: path === '/shipments/new/form' },
+        { num: 3, label: '확인', active: false },
+        { num: 4, label: '완료', active: false }
+      ];
+
+      html = `<div class="process-steps">
+        ${steps.map(step => `
+          <div class="step ${step.active ? 'active' : ''}">
+            <span class="step-number">${step.num}</span>
+            <span class="step-label">${step.label}</span>
+          </div>
+        `).join('')}
+      </div>
+      <a href="#/" style="margin-left:auto;">← 돌아가기</a>`;
     } else if (path.startsWith('/admin')) {
       html = `<a href="#/admin" data-route="/admin" class="active">대시보드</a>
               <a href="#/admin/shipments" data-route="/admin/shipments">접수 목록</a>
@@ -1083,7 +1097,8 @@
     const raw = location.hash.slice(1) || '/';
     const [path, queryString] = raw.split('?');
     const params = new URLSearchParams(queryString || '');
-    renderNav(path);
+    const queryParams = Object.fromEntries(params);
+    renderNav(path, queryParams);
     updateReviewCount();
 
     if (path === '/') renderHome();
