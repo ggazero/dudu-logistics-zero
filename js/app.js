@@ -399,7 +399,78 @@
     `;
   }
 
-  function renderNewShipment() {
+  function renderCustomerLogin() {
+    app.innerHTML = `${pageHead('Guest login', '비회원 택배접수', '휴대전화번호와 이름을 입력해주세요.', '<a class="button" href="#/">← 돌아가기</a>')}
+      <div class="form-layout">
+        <form id="customerLoginForm" class="form-card" novalidate>
+          <section class="form-section">
+            <div class="section-title"><span>1</span><h2>간편 로그인</h2></div>
+            <div class="form-group">
+              <label for="customerPhone">휴대전화번호 <span style="color:red;">*</span></label>
+              <input type="tel" id="customerPhone" placeholder="010-1234-5678" required style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+            </div>
+            <div class="form-group">
+              <label for="customerName">이름 <span style="color:red;">*</span></label>
+              <input type="text" id="customerName" placeholder="홍길동" required style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+            </div>
+          </section>
+          <div class="button-row">
+            <button type="submit" class="button primary">다음 (접수)</button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    document.getElementById('customerLoginForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const phone = document.getElementById('customerPhone').value.trim();
+      const name = document.getElementById('customerName').value.trim();
+      if (!phone || !name) {
+        showToast('모든 정보를 입력해주세요.');
+        return;
+      }
+      sessionStorage.setItem('customer_phone', phone);
+      sessionStorage.setItem('customer_name', name);
+      location.hash = `#/shipments/new/form?type=customer`;
+    });
+  }
+
+  function renderMemberLogin() {
+    app.innerHTML = `${pageHead('Member login', '회원 택배접수', '회원번호를 입력해주세요.', '<a class="button" href="#/">← 돌아가기</a>')}
+      <div class="form-layout">
+        <form id="memberLoginForm" class="form-card" novalidate>
+          <section class="form-section">
+            <div class="section-title"><span>1</span><h2>회원 인증</h2></div>
+            <div class="form-group">
+              <label for="memberNo">회원번호 <span style="color:red;">*</span></label>
+              <input type="text" id="memberNo" placeholder="예: MEM123456" required style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+              <div style="font-size:13px;color:#667085;margin-top:4px;">가입 시 발급받은 회원번호를 입력하세요.</div>
+            </div>
+          </section>
+          <div class="button-row">
+            <button type="submit" class="button primary">다음 (접수)</button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    document.getElementById('memberLoginForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const memberNo = document.getElementById('memberNo').value.trim().toUpperCase();
+      if (!memberNo) {
+        showToast('회원번호를 입력해주세요.');
+        return;
+      }
+      sessionStorage.setItem('member_no', memberNo);
+      location.hash = `#/shipments/new/form?type=member`;
+    });
+  }
+
+  function renderNewShipment(type) {
+    const customerName = sessionStorage.getItem('customer_name') || '';
+    const customerPhone = sessionStorage.getItem('customer_phone') || '';
+    const memberNo = sessionStorage.getItem('member_no') || '';
+
     const branchOptions = policy.BRANCHES.map((branch) => `<option value="${branch.code}">${escapeHtml(branch.name)} · ${escapeHtml(branch.hub)}</option>`).join('');
     const destinationOptions = policy.DESTINATIONS.map((area) => `<option value="${escapeHtml(area.name)}">${escapeHtml(area.name)} · ${escapeHtml(area.region)}</option>`).join('');
 
@@ -422,8 +493,10 @@
               </div>
               <div class="field">
                 <label for="senderName">보내는 분 이름 <b class="required">*</b></label>
-                <input id="senderName" name="senderName" autocomplete="name" maxlength="40" placeholder="예: 김민준">
+                <input id="senderName" name="senderName" autocomplete="name" maxlength="40" placeholder="예: 김민준" value="${customerName}">
               </div>
+              ${type === 'customer' ? `<div class="field"><label for="senderPhone">휴대전화번호 <b class="required">*</b></label><input id="senderPhone" name="senderPhone" type="tel" readonly value="${customerPhone}" style="background:#f5f5f5;"></div>` : ''}
+              ${type === 'member' ? `<div class="field"><label for="memberNo">회원번호</label><input id="memberNo" type="text" readonly value="${memberNo}" style="background:#f5f5f5;"></div>` : ''}
               <div class="field">
                 <label for="receiverName">받는 분 이름 <b class="required">*</b></label>
                 <input id="receiverName" name="receiverName" maxlength="40" placeholder="예: 이서연">
@@ -792,8 +865,16 @@
     if (path === '/') renderHome();
     else if (path === '/shipments/new') {
       const params = new URLSearchParams(location.search);
-      if (params.get('type') === 'reserved') renderReservedIntake();
+      const type = params.get('type');
+      if (type === 'reserved') renderReservedIntake();
+      else if (type === 'customer') renderCustomerLogin();
+      else if (type === 'member') renderMemberLogin();
       else renderNewShipment();
+    }
+    else if (path === '/shipments/new/form') {
+      const params = new URLSearchParams(location.search);
+      const type = params.get('type');
+      renderNewShipment(type);
     }
     else if (path.startsWith('/shipments/reserved/')) {
       const parts = path.slice('/shipments/reserved/'.length).split('/');
