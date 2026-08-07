@@ -445,8 +445,7 @@
     `;
 
     document.getElementById('completeBtn').addEventListener('click', () => {
-      sessionStorage.setItem(`reserved_${reservationNo}_completed`, 'true');
-      location.hash = `#/shipments/reserved/${encodeURIComponent(reservationNo)}/complete`;
+      submitReservedShipment(reservationNo);
     });
   }
 
@@ -458,6 +457,7 @@
     const depth = parseInt(sessionStorage.getItem('reserved_depth') || '0');
     const receiverName = sessionStorage.getItem('reserved_receiver_name') || reservation.receiverName;
     const receiverArea = sessionStorage.getItem('reserved_receiver_area') || reservation.receiverArea;
+    const trackingNo = sessionStorage.getItem('reserved_tracking_no') || '';
 
     if (!reservation) {
       renderNotFound('정보를 찾을 수 없습니다.');
@@ -474,10 +474,10 @@
         <article class="card" style="max-width:600px;width:100%;">
           <div style="padding:24px;">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+              <div><strong>운송장번호</strong><div style="color:#0066cc;margin-top:4px;font-size:18px;font-weight:700;">${escapeHtml(trackingNo)}</div></div>
               <div><strong>예약번호</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${escapeHtml(reservation.reservationNo)}</div></div>
               <div><strong>보내는 분</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${escapeHtml(reservation.senderName)}</div></div>
               <div><strong>받는 분</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${escapeHtml(receiverName)}</div></div>
-              <div><strong>도착지역</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${escapeHtml(receiverArea)}</div></div>
               <div><strong>무게</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${weight}kg</div></div>
               <div><strong>상자크기</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${width}×${height}×${depth}cm</div></div>
             </div>
@@ -872,6 +872,121 @@
     preview.innerHTML = html;
     submitButton.disabled = result.errors.length > 0 || submitting;
     submitButton.textContent = result.itemDecision.outcome === 'review' ? '보류 상태로 접수' : '접수 완료';
+  }
+
+  async function submitReservedShipment(reservationNo) {
+    if (submitting) return;
+    const reservation = mockReservations[reservationNo];
+    const weight = parseFloat(sessionStorage.getItem(`reserved_${reservationNo}_weight`) || '0');
+    const width = parseInt(sessionStorage.getItem('reserved_width') || '0');
+    const height = parseInt(sessionStorage.getItem('reserved_height') || '0');
+    const depth = parseInt(sessionStorage.getItem('reserved_depth') || '0');
+    const receiverName = sessionStorage.getItem('reserved_receiver_name') || '';
+    const receiverArea = sessionStorage.getItem('reserved_receiver_area') || '';
+
+    if (!reservation || !weight || !width || !height || !depth || !receiverName || !receiverArea) {
+      showToast('필수 정보가 부족합니다.');
+      return;
+    }
+
+    submitting = true;
+    const acceptedAt = new Date();
+    const branch = policy.BRANCHES.find(b => b.code === '01') || policy.BRANCHES[0];
+    const destination = policy.AREAS.find(a => a.name === receiverArea);
+    if (!destination) {
+      submitting = false;
+      showToast('도착지역을 다시 확인해 주세요.');
+      return;
+    }
+
+    const trackingNo = domain.nextTrackingNo(branch.code, shipments);
+    if (shipments.some((shipment) => shipment.trackingNo === trackingNo)) {
+      submitting = false;
+      showToast('운송장 중복을 발견했습니다. 다시 시도해 주세요.');
+      return;
+    }
+
+    const calculation = {
+      weight,
+      width,
+      height,
+      depth,
+      volumeWeight: (width * height * depth) / 6000,
+      billedWeight: Math.max(weight, (width * height * depth) / 6000),
+      dimensionSum: width + height + depth,
+      region: destination.region,
+      grade: domain.calculateGrade(Math.max(weight, (width * height * depth) / 6000), width + height + depth),
+    };
+    calculation.price = domain.calculatePrice(calculation.grade, calculation.region);
+
+    const eta = domain.addBusinessDays(acceptedAt, policy.ETA_BUSINESS_DAYS[calculation.region]);
+    const record = {
+      requestId: makeId(),
+      trackingNo,
+      acceptedAt: acceptedAt.toISOString(),
+      policyVersion: policy.VERSION,
+      status: '집화처리',
+      statusHistory: [{ status: '집화처리', changedAt: acceptedAt.toISOString(), source: '예약택배 접수' }],
+      branch: { code: branch.code, name: branch.name, hub: branch.hub },
+      sender: { name: reservation.senderName },
+      receiver: { name: receiverName, area: destination.name, region: destination.region },
+      item: { name: reservation.itemName, declaredValue: reservation.declaredValue || 0 },
+      raw: {
+        senderName: reservation.senderName,
+        receiverName,
+        receiverArea,
+        itemName: reservation.itemName,
+        declaredValue: reservation.declaredValue || 0,
+        weight_kg: weight,
+        width_cm: width,
+        height_cm: height,
+        depth_cm: depth,
+        reservationNo,
+      },
+      calculation: {
+        weight: calculation.weight,
+        width: calculation.width,
+        height: calculation.height,
+        depth: calculation.depth,
+        volumeWeight: Math.round(calculation.volumeWeight * 100) / 100,
+        billedWeight: Math.round(calculation.billedWeight * 100) / 100,
+        dimensionSum: Math.round(calculation.dimensionSum * 10) / 10,
+        grade: calculation.grade,
+        region: calculation.region,
+        price: calculation.price,
+        etaDate: domain.formatDate(eta),
+      },
+      review: { status: 'none', reason: '', reviewer: '', note: '', reviewedAt: null },
+    };
+
+    shipments.push(record);
+    persist();
+
+    try {
+      const res = await fetch('/api/shipments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(record),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        console.warn('Supabase 저장 실패:', error);
+      }
+    } catch (err) {
+      console.warn('Supabase 저장 요청 실패:', err);
+    }
+
+    submitting = false;
+    sessionStorage.setItem('reserved_tracking_no', trackingNo);
+    sessionStorage.removeItem('reservation_no');
+    sessionStorage.removeItem('reserved_weight');
+    sessionStorage.removeItem('reserved_width');
+    sessionStorage.removeItem('reserved_height');
+    sessionStorage.removeItem('reserved_depth');
+    sessionStorage.removeItem('reserved_receiver_name');
+    sessionStorage.removeItem('reserved_receiver_area');
+    location.hash = `#/shipments/reserved/${encodeURIComponent(reservationNo)}/complete`;
+    showToast('접수가 완료되었습니다.');
   }
 
   async function submitShipment(event) {
