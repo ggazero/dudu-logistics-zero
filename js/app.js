@@ -466,10 +466,119 @@
     });
   }
 
+  function renderShoppingLogin() {
+    app.innerHTML = `${pageHead('Shopping login', '쇼핑몰 접수', '쇼핑몰 사업자번호를 입력해주세요.', '<a class="button" href="#/">← 돌아가기</a>')}
+      <div class="form-layout">
+        <form id="shoppingLoginForm" class="form-card" novalidate>
+          <section class="form-section">
+            <div class="section-title"><span>1</span><h2>쇼핑몰 인증</h2></div>
+            <div class="form-group">
+              <label for="shoppingNo">사업자번호 <span style="color:red;">*</span></label>
+              <input type="text" id="shoppingNo" placeholder="예: 123-45-67890" required style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+              <div style="font-size:13px;color:#667085;margin-top:4px;">쇼핑몰 등록 시 발급받은 사업자번호를 입력하세요.</div>
+            </div>
+          </section>
+          <div class="button-row">
+            <button type="submit" class="button primary">다음 (접수)</button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    document.getElementById('shoppingLoginForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const shoppingNo = document.getElementById('shoppingNo').value.trim();
+      if (!shoppingNo) {
+        showToast('사업자번호를 입력해주세요.');
+        return;
+      }
+      sessionStorage.setItem('shopping_no', shoppingNo);
+      location.hash = `#/shipments/new/form?type=shopping`;
+    });
+  }
+
+  function renderBranchLogin() {
+    app.innerHTML = `${pageHead('Branch login', '점간 택배접수', '지점 고유번호를 입력해주세요.', '<a class="button" href="#/">← 돌아가기</a>')}
+      <div class="form-layout">
+        <form id="branchLoginForm" class="form-card" novalidate>
+          <section class="form-section">
+            <div class="section-title"><span>1</span><h2>지점 인증</h2></div>
+            <div class="form-group">
+              <label for="branchNo">지점 고유번호 <span style="color:red;">*</span></label>
+              <input type="text" id="branchNo" placeholder="예: BR-11-0001" required style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+              <div style="font-size:13px;color:#667085;margin-top:4px;">귀사 지점에 할당된 고유번호를 입력하세요.</div>
+            </div>
+          </section>
+          <div class="button-row">
+            <button type="submit" class="button primary">다음 (접수)</button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    document.getElementById('branchLoginForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const branchNo = document.getElementById('branchNo').value.trim().toUpperCase();
+      if (!branchNo) {
+        showToast('지점 고유번호를 입력해주세요.');
+        return;
+      }
+      sessionStorage.setItem('branch_no', branchNo);
+      location.hash = `#/shipments/new/form?type=branch`;
+    });
+  }
+
+  function renderKakaoTalkSent(trackingNo) {
+    const shipment = shipments.find((item) => item.trackingNo === trackingNo);
+    if (!shipment) {
+      renderNotFound('접수 정보를 찾을 수 없습니다.');
+      return;
+    }
+
+    app.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;gap:24px;padding:24px;">
+        <div style="text-align:center;">
+          <div style="font-size:64px;margin-bottom:16px;">✓</div>
+          <h1 style="font-size:32px;margin:0;color:#172033;">카카오톡 전송 완료</h1>
+          <p style="font-size:16px;color:#667085;margin:8px 0 0 0;">접수 내용이 카카오톡으로 전송되었습니다.</p>
+        </div>
+        <article class="card" style="max-width:600px;width:100%;">
+          <div style="padding:24px;border-bottom:1px solid #dfe4ec;">
+            <div style="font-size:13px;color:#667085;margin-bottom:16px;">📱 카카오톡 메시지 내용</div>
+            <div style="background:#f5f5f5;padding:16px;border-radius:8px;border-left:4px solid #0066cc;">
+              <div style="font-weight:600;margin-bottom:8px;">두두택배 접수 완료</div>
+              <div style="font-size:14px;line-height:1.6;color:#333;">
+                <div>📦 운송장번호: ${escapeHtml(shipment.trackingNo)}</div>
+                <div>👤 받는 분: ${escapeHtml(shipment.receiver.name)}</div>
+                <div>📍 지역: ${escapeHtml(shipment.receiver.area)}</div>
+                <div>📦 물품: ${escapeHtml(shipment.item.name)}</div>
+                <div>💰 요금: ${escapeHtml(shipment.calculation.price.toLocaleString())}원</div>
+                <div>📅 도착: ${escapeHtml(shipment.calculation.etaDate)}</div>
+              </div>
+            </div>
+          </div>
+          <div style="padding:24px;">
+            <div style="font-size:13px;color:#667085;margin-bottom:8px;">접수 정보</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:14px;">
+              <div><strong>접수시각</strong><div style="color:#667085;margin-top:4px;">${new Date(shipment.acceptedAt).toLocaleString('ko-KR')}</div></div>
+              <div><strong>상태</strong><div style="color:#667085;margin-top:4px;">${escapeHtml(shipment.status)}</div></div>
+            </div>
+          </div>
+        </article>
+        <div class="button-row">
+          <a href="#/admin/shipments" class="button">접수목록 보기</a>
+          <a href="#/" class="button primary">홈으로 돌아가기</a>
+        </div>
+      </div>
+    `;
+  }
+
   function renderNewShipment(type) {
     const customerName = sessionStorage.getItem('customer_name') || '';
     const customerPhone = sessionStorage.getItem('customer_phone') || '';
     const memberNo = sessionStorage.getItem('member_no') || '';
+    const shoppingNo = sessionStorage.getItem('shopping_no') || '';
+    const branchNo = sessionStorage.getItem('branch_no') || '';
 
     const branchOptions = policy.BRANCHES.map((branch) => `<option value="${branch.code}">${escapeHtml(branch.name)} · ${escapeHtml(branch.hub)}</option>`).join('');
     const destinationOptions = policy.DESTINATIONS.map((area) => `<option value="${escapeHtml(area.name)}">${escapeHtml(area.name)} · ${escapeHtml(area.region)}</option>`).join('');
@@ -497,6 +606,8 @@
               </div>
               ${type === 'customer' ? `<div class="field"><label for="senderPhone">휴대전화번호 <b class="required">*</b></label><input id="senderPhone" name="senderPhone" type="tel" readonly value="${customerPhone}" style="background:#f5f5f5;"></div>` : ''}
               ${type === 'member' ? `<div class="field"><label for="memberNo">회원번호</label><input id="memberNo" type="text" readonly value="${memberNo}" style="background:#f5f5f5;"></div>` : ''}
+              ${type === 'shopping' ? `<div class="field"><label for="shoppingNo">사업자번호</label><input id="shoppingNo" type="text" readonly value="${shoppingNo}" style="background:#f5f5f5;"></div>` : ''}
+              ${type === 'branch' ? `<div class="field"><label for="branchNo">지점 고유번호</label><input id="branchNo" type="text" readonly value="${branchNo}" style="background:#f5f5f5;"></div>` : ''}
               <div class="field">
                 <label for="receiverName">받는 분 이름 <b class="required">*</b></label>
                 <input id="receiverName" name="receiverName" maxlength="40" placeholder="예: 이서연">
@@ -702,8 +813,8 @@
     }
 
     submitting = false;
-    location.hash = `#/shipments/${encodeURIComponent(trackingNo)}`;
-    showToast(isReview ? '보류 상태로 접수했습니다.' : '접수가 완료됐습니다.');
+    location.hash = `#/shipments/kakaotalk/${encodeURIComponent(trackingNo)}`;
+    showToast('접수가 완료되었습니다. 카카오톡으로 내용이 전송되었습니다.');
   }
 
   function renderShipmentList() {
@@ -945,6 +1056,8 @@
       if (type === 'reserved') renderReservedIntake();
       else if (type === 'customer') renderCustomerLogin();
       else if (type === 'member') renderMemberLogin();
+      else if (type === 'shopping') renderShoppingLogin();
+      else if (type === 'branch') renderBranchLogin();
       else renderNewShipment();
     }
     else if (path === '/shipments/new/form') {
@@ -963,6 +1076,7 @@
     else if (path === '/admin/shipments') renderShipmentList();
     else if (path === '/admin/reviews') renderReviews();
     else if (path === '/admin/policy') renderPolicy();
+    else if (path.startsWith('/shipments/kakaotalk/')) renderKakaoTalkSent(decodeURIComponent(path.slice('/shipments/kakaotalk/'.length)));
     else if (path.startsWith('/shipments/')) renderShipmentDetail(decodeURIComponent(path.slice('/shipments/'.length)));
     else renderNotFound();
     window.scrollTo({ top: 0, behavior: 'auto' });
