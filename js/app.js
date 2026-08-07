@@ -269,7 +269,7 @@
     app.innerHTML = `
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;gap:24px;">
         <div style="text-align:center;margin-bottom:16px;">
-          <h1 style="font-size:32px;margin:0;color:#172033;">두두택배</h1>
+          <h1 style="font-size:32px;margin:0;color:#172033;">두두 x CU 택배</h1>
           <p style="font-size:16px;color:#667085;margin:8px 0 0 0;">접수 방식을 선택해주세요</p>
         </div>
         <div style="display:flex;flex-direction:column;gap:16px;max-width:600px;width:100%;">
@@ -668,7 +668,7 @@
           <div style="padding:24px;border-bottom:1px solid #dfe4ec;">
             <div style="font-size:13px;color:#667085;margin-bottom:16px;">📱 카카오톡 메시지 내용</div>
             <div style="background:#f5f5f5;padding:16px;border-radius:8px;border-left:4px solid #0066cc;">
-              <div style="font-weight:600;margin-bottom:8px;">두두택배 접수 완료</div>
+              <div style="font-weight:600;margin-bottom:8px;">두두 x CU 택배 접수 완료</div>
               <div style="font-size:14px;line-height:1.6;color:#333;">
                 <div>📦 운송장번호: ${escapeHtml(shipment.trackingNo)}</div>
                 <div>👤 받는 분: ${escapeHtml(shipment.receiver.name)}</div>
