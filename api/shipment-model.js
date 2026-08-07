@@ -124,11 +124,13 @@ export function validateAndNormalizeShipment(payload, now = new Date()) {
   const senderName = cleanText(payload.sender?.name, 40);
   const receiverName = cleanText(payload.receiver?.name, 40);
   const receiverArea = cleanText(payload.receiver?.area, 20);
+  const receiverAddress = cleanText(payload.receiver?.address, 200);
   const region = DESTINATIONS[receiverArea];
   const itemName = cleanText(payload.item?.name, 80);
   const itemCategory = cleanText(payload.item?.category, 20);
   if (!senderName) errors.push('보내는 분 이름이 필요합니다.');
   if (!receiverName) errors.push('받는 분 이름이 필요합니다.');
+  if (!receiverAddress) errors.push('도착 주소가 필요합니다.');
   if (!region) errors.push('표준 도착 지역을 선택해 주세요.');
   if (!itemName) errors.push('물품명이 필요합니다.');
   if (!ITEM_CATEGORIES.has(itemCategory)) errors.push('표준 품목 카테고리를 선택해 주세요.');
@@ -193,6 +195,7 @@ export function validateAndNormalizeShipment(payload, now = new Date()) {
     destination: receiverArea,
     senderName,
     receiverName,
+    receiverAddress,
     itemName,
     itemCategory,
     declaredValue,
@@ -208,7 +211,7 @@ export function validateAndNormalizeShipment(payload, now = new Date()) {
     status: '집화처리',
     branch,
     sender: { name: senderName },
-    receiver: { name: receiverName, area: receiverArea, region },
+    receiver: { name: receiverName, area: receiverArea, address: receiverAddress, region },
     item: { name: itemName, category: itemCategory, declaredValue },
     delivery,
     measurementMode,
