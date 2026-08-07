@@ -94,7 +94,7 @@
     const navEl = document.getElementById('mainNav');
     let html = '';
 
-    if (path === '/') {
+    if (path === '/' || path === '/shipments/new') {
       html = '<a href="#/" data-route="/" class="active">새 접수</a>';
     } else if (path.startsWith('/admin')) {
       html = `<a href="#/admin" data-route="/admin" class="active">대시보드</a>
@@ -141,6 +141,35 @@
         <tbody id="shipmentRows">${shipmentRows(rows)}</tbody>
       </table>
     </div>`;
+  }
+
+  function renderHome() {
+    app.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;gap:24px;">
+        <div style="text-align:center;margin-bottom:16px;">
+          <h1 style="font-size:32px;margin:0;color:#172033;">두두택배</h1>
+          <p style="font-size:16px;color:#667085;margin:8px 0 0 0;">접수 방식을 선택해주세요</p>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:600px;width:100%;">
+          <a href="#/shipments/new?type=customer" style="padding:32px 24px;border:2px solid #dfe4ec;border-radius:8px;text-align:center;text-decoration:none;color:#172033;background:white;transition:all 0.2s;cursor:pointer;" onmouseover="this.style.borderColor='#0066cc';this.style.backgroundColor='#f5f9ff'" onmouseout="this.style.borderColor='#dfe4ec';this.style.backgroundColor='white'">
+            <div style="font-size:18px;font-weight:600;margin-bottom:8px;">비회원 택배접수</div>
+            <div style="font-size:14px;color:#667085;">회원 가입 없이 접수</div>
+          </a>
+          <a href="#/shipments/new?type=member" style="padding:32px 24px;border:2px solid #dfe4ec;border-radius:8px;text-align:center;text-decoration:none;color:#172033;background:white;transition:all 0.2s;cursor:pointer;" onmouseover="this.style.borderColor='#0066cc';this.style.backgroundColor='#f5f9ff'" onmouseout="this.style.borderColor='#dfe4ec';this.style.backgroundColor='white'">
+            <div style="font-size:18px;font-weight:600;margin-bottom:8px;">회원 택배접수</div>
+            <div style="font-size:14px;color:#667085;">회원 정보로 접수</div>
+          </a>
+          <a href="#/shipments/new?type=shopping" style="padding:32px 24px;border:2px solid #dfe4ec;border-radius:8px;text-align:center;text-decoration:none;color:#172033;background:white;transition:all 0.2s;cursor:pointer;" onmouseover="this.style.borderColor='#0066cc';this.style.backgroundColor='#f5f9ff'" onmouseout="this.style.borderColor='#dfe4ec';this.style.backgroundColor='white'">
+            <div style="font-size:18px;font-weight:600;margin-bottom:8px;">쇼핑몰 접수</div>
+            <div style="font-size:14px;color:#667085;">쇼핑몰 연동 접수</div>
+          </a>
+          <a href="#/shipments/new?type=branch" style="padding:32px 24px;border:2px solid #dfe4ec;border-radius:8px;text-align:center;text-decoration:none;color:#172033;background:white;transition:all 0.2s;cursor:pointer;" onmouseover="this.style.borderColor='#0066cc';this.style.backgroundColor='#f5f9ff'" onmouseout="this.style.borderColor='#dfe4ec';this.style.backgroundColor='white'">
+            <div style="font-size:18px;font-weight:600;margin-bottom:8px;">점간 택배접수</div>
+            <div style="font-size:14px;color:#667085;">지점 간 접수</div>
+          </a>
+        </div>
+      </div>
+    `;
   }
 
   function renderDashboard() {
@@ -565,7 +594,8 @@
     renderNav(path);
     updateReviewCount();
 
-    if (path === '/') renderNewShipment();
+    if (path === '/') renderHome();
+    else if (path === '/shipments/new') renderNewShipment();
     else if (path === '/admin') renderDashboard();
     else if (path === '/admin/shipments') renderShipmentList();
     else if (path === '/admin/reviews') renderReviews();
