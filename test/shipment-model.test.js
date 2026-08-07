@@ -15,7 +15,10 @@ function validPayload(overrides = {}) {
     policyVersion: '2026-08-06',
     branch: { code: '11', name: '변조된 지점명' },
     sender: { name: '김발송' },
-    receiver: { name: '이수령', area: '서울', address: '서울시 중구 테스트로 10', region: '변조된 권역' },
+    receiver: {
+      name: '이수령', phone: '010-1234-5678', area: '서울',
+      address: '서울시 중구 테스트로 10', region: '변조된 권역',
+    },
     item: { name: '셔츠', category: 'clothing', declaredValue: 10000 },
     delivery: { code: 'economy' },
     measurementMode: 'manual',
@@ -31,6 +34,7 @@ test('서버가 지점·권역·요금을 다시 계산하고 클라이언트 �
   assert.equal(record.branch.name, '서울지점');
   assert.equal(record.receiver.region, '일반');
   assert.equal(record.receiver.address, '서울시 중구 테스트로 10');
+  assert.equal(record.receiver.phone, '010-1234-5678');
   assert.equal(record.calculation.grade, '극소형');
   assert.equal(record.calculation.billedWeight, 2);
   assert.equal(record.calculation.price, 3500);
@@ -66,6 +70,15 @@ test('도착 주소가 없으면 서버에서 접수를 차단한다', () => {
   assert.throws(
     () => validateAndNormalizeShipment(validPayload({ receiver: { name: '이수령', area: '서울', address: '' } }), NOW),
     /도착 주소/,
+  );
+});
+
+test('받는 분 휴대전화번호 형식이 잘못되면 서버에서 차단한다', () => {
+  assert.throws(
+    () => validateAndNormalizeShipment(validPayload({
+      receiver: { name: '이수령', phone: '02-123-4567', area: '서울', address: '서울 테스트로 10' },
+    }), NOW),
+    /휴대전화번호/,
   );
 });
 

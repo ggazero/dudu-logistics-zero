@@ -101,6 +101,7 @@
       sender: { name: row.sender_name },
       receiver: {
         name: row.receiver_name,
+        phone: raw.receiverPhone || raw.receiver_phone || '',
         area: destination.name,
         address: raw.receiverAddress || raw.receiver_address || '',
         region: destination.region,
@@ -181,6 +182,21 @@
     return new Intl.DateTimeFormat('ko-KR', {
       year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
     }).format(new Date(value));
+  }
+
+  function normalizePhone(value) {
+    const digits = String(value || '').replace(/\D/g, '');
+    if (!/^01[016789]\d{7,8}$/.test(digits)) return '';
+    return digits.length === 11
+      ? `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`
+      : `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+
+  function maskPhone(value) {
+    const normalized = normalizePhone(value);
+    if (!normalized) return '번호 미기록';
+    const [prefix, , suffix] = normalized.split('-');
+    return `${prefix}-****-${suffix}`;
   }
 
   function makeId() {
@@ -287,7 +303,8 @@
 
   function updateShipmentProgress(values) {
     const receptionComplete = Boolean(
-      values.branchCode && values.destination && values.senderName && values.receiverName && values.receiverAddress
+      values.branchCode && values.destination && values.senderName && values.receiverName
+      && values.receiverPhone && values.receiverAddress
     );
     if (!receptionComplete) {
       setShipmentProgress(1);
@@ -440,7 +457,7 @@
     text(`${shipment.branch.name}  ${shipment.delivery?.name || '일반 알뜰택배'}`, 735, 70, 28, 800);
     text(`도착  ${shipment.receiver.area}`, 735, 125, 46, 900);
     text(`보내는 사람  ${shipment.sender.name}`, 40, 295, 27, 700);
-    text(`받는 사람  ${shipment.receiver.name}`, 40, 335, 27, 700);
+    text(`받는 사람  ${shipment.receiver.name}  ${maskPhone(shipment.receiver.phone)}`, 40, 335, 27, 700);
     text(`주소  ${String(shipment.receiver.address || '').slice(0, 42)}`, 40, 373, 20, 600);
     text(`상품명  ${shipment.item.name}`, 40, 450, 30, 700);
     text(`접수일  ${domain.formatDate(shipment.acceptedAt)}`, 700, 450, 28, 700);
@@ -732,6 +749,10 @@
                 </select>
               </div>
               <div class="form-group" style="grid-column:1 / -1;">
+                <label for="receiverPhone">받는 분 전화번호 <span style="color:var(--red);">*</span></label>
+                <input type="tel" id="receiverPhone" autocomplete="tel" maxlength="13" placeholder="010-1234-5678" style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
+              </div>
+              <div class="form-group" style="grid-column:1 / -1;">
                 <label for="receiverAddress">도착 주소 <span style="color:var(--red);">*</span></label>
                 <input type="text" id="receiverAddress" autocomplete="street-address" maxlength="200" placeholder="예: 서울시 중구 세종대로 110, 3층" style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
               </div>
@@ -749,6 +770,7 @@
       e.preventDefault();
       const receiverName = document.getElementById('receiverName').value.trim();
       const receiverArea = document.getElementById('receiverArea').value.trim();
+      const receiverPhone = normalizePhone(document.getElementById('receiverPhone').value);
       const receiverAddress = document.getElementById('receiverAddress').value.trim();
 
       if (!receiverName) {
@@ -759,6 +781,10 @@
         showToast('도착지역을 선택해주세요.');
         return;
       }
+      if (!receiverPhone) {
+        showToast('받는 분 전화번호를 확인해주세요.');
+        return;
+      }
       if (!receiverAddress) {
         showToast('도착 주소를 입력해주세요.');
         return;
@@ -766,6 +792,7 @@
 
       sessionStorage.setItem('reserved_receiver_name', receiverName);
       sessionStorage.setItem('reserved_receiver_area', receiverArea);
+      sessionStorage.setItem('reserved_receiver_phone', receiverPhone);
       sessionStorage.setItem('reserved_receiver_address', receiverAddress);
       sessionStorage.setItem(`reserved_${reservationNo}_weight`, savedWeight);
       navigate(`/shipments/reserved/${encodeURIComponent(reservationNo)}/review`);
@@ -784,9 +811,10 @@
     const depth = parseInt(sessionStorage.getItem('reserved_depth') || '0');
     const receiverName = sessionStorage.getItem('reserved_receiver_name') || reservation.receiverName;
     const receiverArea = sessionStorage.getItem('reserved_receiver_area') || reservation.receiverArea;
+    const receiverPhone = sessionStorage.getItem('reserved_receiver_phone') || '';
     const receiverAddress = sessionStorage.getItem('reserved_receiver_address') || '';
 
-    if (!weight || !receiverAddress) {
+    if (!weight || !receiverPhone || !receiverAddress) {
       renderNotFound('정보를 찾을 수 없습니다.');
       return;
     }
@@ -817,6 +845,7 @@
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
               <div><strong>받는 분</strong><div style="color:#667085;margin-top:4px;">${escapeHtml(receiverName)}</div></div>
               <div><strong>도착지역</strong><div style="color:#667085;margin-top:4px;">${escapeHtml(receiverArea)}</div></div>
+              <div><strong>받는 분 전화번호</strong><div style="color:#667085;margin-top:4px;">${escapeHtml(maskPhone(receiverPhone))}</div></div>
               <div style="grid-column:1 / -1;"><strong>도착 주소</strong><div style="color:#667085;margin-top:4px;">${escapeHtml(receiverAddress)}</div></div>
             </div>
           </section>
@@ -853,6 +882,7 @@
 
     const { weight, width, height, depth } = shipment.calculation;
     const receiverName = shipment.receiver.name;
+    const receiverPhone = shipment.receiver.phone;
     const receiverAddress = shipment.receiver.address;
 
     const labelDataUrl = createShippingLabelDataUrl(shipment);
@@ -870,6 +900,7 @@
               <div><strong>예약번호</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${escapeHtml(reservation.reservationNo)}</div></div>
               <div><strong>보내는 분</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${escapeHtml(reservation.senderName)}</div></div>
               <div><strong>받는 분</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${escapeHtml(receiverName)}</div></div>
+              <div><strong>전화번호</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${escapeHtml(maskPhone(receiverPhone))}</div></div>
               <div style="grid-column:1 / -1;"><strong>도착 주소</strong><div style="color:#667085;margin-top:4px;font-size:16px;">${escapeHtml(receiverAddress)}</div></div>
               <div><strong>무게</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${weight}kg</div></div>
               <div><strong>상자크기</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${width}×${height}×${depth}cm</div></div>
@@ -1034,6 +1065,7 @@
               <div style="font-size:14px;line-height:1.6;color:#333;">
                 <div>📦 운송장번호: ${escapeHtml(shipment.trackingNo)}</div>
                 <div>👤 받는 분: ${escapeHtml(shipment.receiver.name)}</div>
+                <div>📞 전화번호: ${escapeHtml(maskPhone(shipment.receiver.phone))}</div>
                 <div>📍 지역: ${escapeHtml(shipment.receiver.area)}</div>
                 <div>🏠 주소: ${escapeHtml(shipment.receiver.address)}</div>
                 <div>📦 물품: ${escapeHtml(shipment.item.name)}</div>
@@ -1102,6 +1134,10 @@
               <div class="field">
                 <label for="receiverName">받는 분 이름 <b class="required">*</b></label>
                 <input id="receiverName" name="receiverName" maxlength="40" placeholder="예: 이서연">
+              </div>
+              <div class="field">
+                <label for="receiverPhone">받는 분 전화번호 <b class="required">*</b></label>
+                <input id="receiverPhone" name="receiverPhone" type="tel" autocomplete="tel" maxlength="13" placeholder="010-1234-5678">
               </div>
               <div class="field full">
                 <label for="receiverAddress">도착 주소 <b class="required">*</b></label>
@@ -1237,7 +1273,7 @@
 
     // Auto-scroll to next section when current section is complete
     const checkSectionComplete = () => {
-      const section1Fields = ['branchCode', 'destination', 'senderName', 'receiverName', 'receiverAddress', 'itemName'];
+      const section1Fields = ['branchCode', 'destination', 'senderName', 'receiverName', 'receiverPhone', 'receiverAddress', 'itemName'];
       const section1Complete = section1Fields.every(id => {
         const el = document.getElementById(id);
         return el && el.value;
@@ -1263,6 +1299,7 @@
       destination: document.getElementById('destination').value,
       senderName: document.getElementById('senderName').value.trim(),
       receiverName: document.getElementById('receiverName').value.trim(),
+      receiverPhone: document.getElementById('receiverPhone').value.trim(),
       receiverAddress: document.getElementById('receiverAddress').value.trim(),
       itemName: document.getElementById('itemName').value.trim(),
       itemCategory: selectedItemCategory,
@@ -1284,6 +1321,7 @@
     if (!destination) errors.push('도착 지역을 표준 목록에서 선택하세요.');
     if (!values.senderName) errors.push('보내는 분 이름을 입력하세요.');
     if (!values.receiverName) errors.push('받는 분 이름을 입력하세요.');
+    if (!normalizePhone(values.receiverPhone)) errors.push('받는 분 전화번호를 010-1234-5678 형식으로 입력하세요.');
     if (!values.receiverAddress) errors.push('도착 주소를 입력하세요.');
     if (!values.itemName) errors.push('물품명을 입력하세요.');
     if (!itemCategoryFor(values.itemCategory)) errors.push('품목 카테고리를 선택하세요.');
@@ -1307,7 +1345,7 @@
     const submitButton = document.getElementById('submitButton');
     const hasAnyValue = [
       values.branchCode, values.destination, values.senderName, values.receiverName,
-      values.receiverAddress,
+      values.receiverPhone, values.receiverAddress,
       values.itemName, values.itemCategory, values.declaredValue,
       values.weight, values.width, values.height, values.depth,
     ].some(Boolean);
@@ -1364,10 +1402,11 @@
     const depth = parseInt(sessionStorage.getItem('reserved_depth') || '0');
     const receiverName = sessionStorage.getItem('reserved_receiver_name') || '';
     const receiverArea = sessionStorage.getItem('reserved_receiver_area') || '';
+    const receiverPhone = sessionStorage.getItem('reserved_receiver_phone') || '';
     const receiverAddress = sessionStorage.getItem('reserved_receiver_address') || '';
     const reservedMeasurementMode = sessionStorage.getItem('reserved_measurement_mode') || 'manual';
 
-    if (!reservation || !weight || !width || !height || !depth || !receiverName || !receiverArea || !receiverAddress) {
+    if (!reservation || !weight || !width || !height || !depth || !receiverName || !receiverArea || !receiverPhone || !receiverAddress) {
       showToast('필수 정보가 부족합니다.');
       return;
     }
@@ -1405,7 +1444,13 @@
       statusHistory: [{ status: '집화처리', changedAt: acceptedAt.toISOString(), source: '예약택배 접수' }],
       branch: { code: branch.code, name: branch.name, hub: branch.hub },
       sender: { name: reservation.senderName },
-      receiver: { name: receiverName, area: destination.name, address: receiverAddress, region: destination.region },
+      receiver: {
+        name: receiverName,
+        phone: receiverPhone,
+        area: destination.name,
+        address: receiverAddress,
+        region: destination.region,
+      },
       item: {
         name: reservation.itemName,
         category: reservation.itemCategory || 'other',
@@ -1418,6 +1463,7 @@
         senderName: reservation.senderName,
         receiverName,
         receiverArea,
+        receiverPhone,
         receiverAddress,
         itemName: reservation.itemName,
         declaredValue: reservation.declaredValue || 0,
@@ -1462,6 +1508,7 @@
     sessionStorage.removeItem('reserved_depth');
     sessionStorage.removeItem('reserved_receiver_name');
     sessionStorage.removeItem('reserved_receiver_area');
+    sessionStorage.removeItem('reserved_receiver_phone');
     sessionStorage.removeItem('reserved_receiver_address');
     sessionStorage.removeItem('reserved_measurement_mode');
     navigate(`/shipments/reserved/${encodeURIComponent(reservationNo)}/complete`);
@@ -1496,6 +1543,7 @@
       sender: { name: values.senderName },
       receiver: {
         name: values.receiverName,
+        phone: normalizePhone(values.receiverPhone),
         area: result.destination.name,
         address: values.receiverAddress,
         region: result.destination.region,
@@ -1681,6 +1729,7 @@
             <div><dt>허브</dt><dd>${escapeHtml(shipment.branch.hub)}</dd></div>
             <div><dt>보내는 분</dt><dd>${escapeHtml(shipment.sender.name)}</dd></div>
             <div><dt>받는 분</dt><dd>${escapeHtml(shipment.receiver.name)}</dd></div>
+            <div><dt>받는 분 전화번호</dt><dd>${escapeHtml(shipment.receiver.phone || '이전 접수 · 번호 미기록')}</dd></div>
             <div><dt>도착 지역</dt><dd>${escapeHtml(shipment.receiver.area)} · ${escapeHtml(shipment.receiver.region)}</dd></div>
             <div><dt>도착 주소</dt><dd>${escapeHtml(shipment.receiver.address || '이전 접수 · 주소 미기록')}</dd></div>
             <div><dt>택배 서비스</dt><dd>${escapeHtml(shipment.delivery?.name || '일반 알뜰택배')}</dd></div>

@@ -76,6 +76,14 @@ function nonNegativeNumber(value) {
   return Number.isFinite(number) && number >= 0 ? number : null;
 }
 
+function normalizePhone(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  if (!/^01[016789]\d{7,8}$/.test(digits)) return null;
+  return digits.length === 11
+    ? `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`
+    : `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
 function round(value, digits = 2) {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
@@ -125,12 +133,14 @@ export function validateAndNormalizeShipment(payload, now = new Date()) {
   const receiverName = cleanText(payload.receiver?.name, 40);
   const receiverArea = cleanText(payload.receiver?.area, 20);
   const receiverAddress = cleanText(payload.receiver?.address, 200);
+  const receiverPhone = normalizePhone(payload.receiver?.phone);
   const region = DESTINATIONS[receiverArea];
   const itemName = cleanText(payload.item?.name, 80);
   const itemCategory = cleanText(payload.item?.category, 20);
   if (!senderName) errors.push('보내는 분 이름이 필요합니다.');
   if (!receiverName) errors.push('받는 분 이름이 필요합니다.');
   if (!receiverAddress) errors.push('도착 주소가 필요합니다.');
+  if (!receiverPhone) errors.push('받는 분 휴대전화번호 형식을 확인해 주세요.');
   if (!region) errors.push('표준 도착 지역을 선택해 주세요.');
   if (!itemName) errors.push('물품명이 필요합니다.');
   if (!ITEM_CATEGORIES.has(itemCategory)) errors.push('표준 품목 카테고리를 선택해 주세요.');
@@ -196,6 +206,7 @@ export function validateAndNormalizeShipment(payload, now = new Date()) {
     senderName,
     receiverName,
     receiverAddress,
+    receiverPhone,
     itemName,
     itemCategory,
     declaredValue,
@@ -211,7 +222,13 @@ export function validateAndNormalizeShipment(payload, now = new Date()) {
     status: '집화처리',
     branch,
     sender: { name: senderName },
-    receiver: { name: receiverName, area: receiverArea, address: receiverAddress, region },
+    receiver: {
+      name: receiverName,
+      phone: receiverPhone,
+      area: receiverArea,
+      address: receiverAddress,
+      region,
+    },
     item: { name: itemName, category: itemCategory, declaredValue },
     delivery,
     measurementMode,
