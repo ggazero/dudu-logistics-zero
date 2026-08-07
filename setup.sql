@@ -56,3 +56,7 @@ where not exists (select 1 from shipments);
 -- 참고: 새 칸을 추가할 때는 not null을 붙이지 않습니다.
 --   좋은 예: alter table shipments add column memo text;
 --   피할 예: alter table shipments add column memo text not null;  <- 빈 값이 오면 넣기가 실패(500)합니다
+
+-- [4] 운송장 번호 고유성 보장 (기존 제약 제거 후 재생성)
+alter table shipments drop constraint if exists unique_tracking_no;
+alter table shipments add constraint unique_tracking_no unique(tracking_no);
