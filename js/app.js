@@ -708,18 +708,94 @@
 
   function renderShipmentList() {
     const sorted = [...shipments].sort((a, b) => new Date(b.acceptedAt) - new Date(a.acceptedAt));
-    app.innerHTML = `${pageHead('Shipments', '접수 목록', '운송장·이름·물품으로 검색하고 정책 판정 상태를 확인합니다.', '<a class="button primary" href="#/">+ 새 접수</a>')}
-      <div class="toolbar"><input id="shipmentSearch" type="search" placeholder="운송장, 받는 분, 물품 검색" aria-label="접수 검색"></div>
-      ${shipmentTable(sorted)}`;
+    const today = domain.formatDate(new Date());
+    const sevenDaysAgo = domain.formatDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
+
+    const ITEMS_PER_PAGE = 10;
+    let currentPage = 1;
+    let currentDateStart = sevenDaysAgo;
+    let currentDateEnd = today;
+    let currentQuery = '';
+
+    const getFilteredData = () => {
+      return sorted.filter((shipment) => {
+        const shipmentDate = domain.formatDate(shipment.acceptedAt);
+        const dateMatch = shipmentDate >= currentDateStart && shipmentDate <= currentDateEnd;
+        const searchMatch = currentQuery === '' || [
+          shipment.trackingNo, shipment.sender.name, shipment.receiver.name,
+          shipment.item.name, shipment.branch.name, shipment.receiver.area,
+        ].some((value) => String(value).toLowerCase().includes(currentQuery.toLowerCase()));
+        return dateMatch && searchMatch;
+      });
+    };
+
+    const renderList = () => {
+      const filtered = getFilteredData();
+      const totalPages = Math.min(Math.ceil(filtered.length / ITEMS_PER_PAGE), 10);
+      const start = (currentPage - 1) * ITEMS_PER_PAGE;
+      const pageData = filtered.slice(start, start + ITEMS_PER_PAGE);
+
+      const paginationHtml = totalPages > 1 ? `
+        <div style="display:flex;justify-content:center;gap:8px;margin-top:16px;align-items:center;">
+          <button id="prevBtn" class="button" style="padding:8px 12px;" ${currentPage === 1 ? 'disabled' : ''}>← 이전</button>
+          <span style="font-size:14px;color:#667085;min-width:60px;text-align:center;">페이지 ${currentPage} / ${totalPages}</span>
+          <button id="nextBtn" class="button" style="padding:8px 12px;" ${currentPage === totalPages ? 'disabled' : ''}>다음 →</button>
+        </div>
+      ` : '';
+
+      document.getElementById('shipmentTable').innerHTML = shipmentTable(pageData) + paginationHtml;
+
+      if (totalPages > 1) {
+        document.getElementById('prevBtn')?.addEventListener('click', () => {
+          if (currentPage > 1) {
+            currentPage--;
+            renderList();
+          }
+        });
+        document.getElementById('nextBtn')?.addEventListener('click', () => {
+          if (currentPage < totalPages) {
+            currentPage++;
+            renderList();
+          }
+        });
+      }
+    };
+
+    app.innerHTML = `${pageHead('Shipments', '접수 목록', '날짜와 검색어로 필터링하고 목록을 확인합니다.', '<a class="button primary" href="#/">+ 새 접수</a>')}
+      <div class="toolbar">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+          <div>
+            <label for="dateStart" style="font-size:13px;color:#667085;">시작:</label>
+            <input id="dateStart" type="date" value="${sevenDaysAgo}" style="padding:6px;border:1px solid #dfe4ec;border-radius:4px;">
+          </div>
+          <div>
+            <label for="dateEnd" style="font-size:13px;color:#667085;">종료:</label>
+            <input id="dateEnd" type="date" value="${today}" style="padding:6px;border:1px solid #dfe4ec;border-radius:4px;">
+          </div>
+          <input id="shipmentSearch" type="search" placeholder="운송장, 받는 분, 물품 검색" aria-label="접수 검색" style="flex:1;min-width:200px;">
+        </div>
+      </div>
+      <div id="shipmentTable"></div>`;
+
+    document.getElementById('dateStart').addEventListener('change', (e) => {
+      currentDateStart = e.target.value;
+      currentPage = 1;
+      renderList();
+    });
+
+    document.getElementById('dateEnd').addEventListener('change', (e) => {
+      currentDateEnd = e.target.value;
+      currentPage = 1;
+      renderList();
+    });
 
     document.getElementById('shipmentSearch').addEventListener('input', (event) => {
-      const query = event.target.value.trim().toLowerCase();
-      const filtered = sorted.filter((shipment) => [
-        shipment.trackingNo, shipment.sender.name, shipment.receiver.name,
-        shipment.item.name, shipment.branch.name, shipment.receiver.area,
-      ].some((value) => String(value).toLowerCase().includes(query)));
-      document.getElementById('shipmentRows').innerHTML = shipmentRows(filtered);
+      currentQuery = event.target.value.trim();
+      currentPage = 1;
+      renderList();
     });
+
+    renderList();
   }
 
   function renderShipmentDetail(trackingNo) {
