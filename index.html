@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="두두택배 데이터 처리 정책을 반영한 접수·검토 화면">
+  <title>두두택배 운영 콘솔</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#app">본문으로 바로가기</a>
+  <header class="app-header">
+    <div class="header-inner">
+      <a class="brand" href="#/" aria-label="두두택배 운영 콘솔 홈">
+        <span class="brand-mark" aria-hidden="true">두</span>
+        <span><strong>두두택배</strong><small>운영 콘솔</small></span>
+      </a>
+      <nav class="main-nav" aria-label="주요 메뉴">
+        <a href="#/" data-route="home">대시보드</a>
+        <a href="#/shipments/new" data-route="new">새 접수</a>
+        <a href="#/shipments" data-route="list">접수 목록</a>
+        <a href="#/reviews" data-route="reviews">보류 검토 <span id="reviewCount" class="nav-count">0</span></a>
+        <a href="#/policy" data-route="policy">정책 보기</a>
+      </nav>
+      <div class="storage-badge"><span aria-hidden="true"></span> 이 브라우저에 저장</div>
+    </div>
+  </header>
+
+  <main id="app" class="app-main" tabindex="-1"></main>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="js/policy.js"></script>
+  <script src="js/domain.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

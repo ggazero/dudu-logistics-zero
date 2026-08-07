@@ -1,0 +1,9 @@
+{
+  "name": "dudu-logistics",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "두두택배 데이터 처리 정책을 반영한 접수·검토 화면",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.0"
+  }
+}
