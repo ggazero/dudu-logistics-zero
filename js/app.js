@@ -564,10 +564,10 @@
     renderNav(path);
     updateReviewCount();
 
-    if (path === '/') renderShipmentForm();
+    if (path === '/') renderNewShipment();
     else if (path === '/admin') renderDashboard();
     else if (path === '/admin/shipments') renderShipmentList();
-    else if (path === '/admin/reviews') renderReviewQueue();
+    else if (path === '/admin/reviews') renderReviews();
     else if (path === '/admin/policy') renderPolicy();
     else if (path.startsWith('/shipments/')) renderShipmentDetail(decodeURIComponent(path.slice('/shipments/'.length)));
     else renderNotFound();
