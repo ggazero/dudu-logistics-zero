@@ -111,6 +111,9 @@ a { color: inherit; }
 .step.active {
   color: #fff;
 }
+.step.complete {
+  color: #b9e8d7;
+}
 .step-number {
   width: 28px;
   height: 28px;
@@ -124,6 +127,10 @@ a { color: inherit; }
 }
 .step.active .step-number {
   background: var(--blue);
+  color: #fff;
+}
+.step.complete .step-number {
+  background: var(--green);
   color: #fff;
 }
 .step-label {

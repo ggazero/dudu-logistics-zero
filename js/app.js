@@ -98,15 +98,15 @@
       html = '<a href="#/" data-route="/" class="active">새 접수</a>';
     } else if ((path === '/shipments/new' && queryParams.type) || path === '/shipments/new/form') {
       const steps = [
-        { num: 1, label: '정보입력', active: path === '/shipments/new' && queryParams.type },
-        { num: 2, label: '물품정보', active: path === '/shipments/new/form' },
-        { num: 3, label: '확인', active: false },
-        { num: 4, label: '완료', active: false }
+        { num: 1, label: '접수정보' },
+        { num: 2, label: '물품확인' },
+        { num: 3, label: '무게측정' },
+        { num: 4, label: '접수확인' }
       ];
 
       html = `<div class="process-steps">
         ${steps.map(step => `
-          <div class="step ${step.active ? 'active' : ''}">
+          <div class="step ${step.num === 1 ? 'active' : ''}" data-progress-step="${step.num}">
             <span class="step-number">${step.num}</span>
             <span class="step-label">${step.label}</span>
           </div>
@@ -123,6 +123,46 @@
     }
 
     navEl.innerHTML = html;
+  }
+
+  function setShipmentProgress(currentStep) {
+    document.querySelectorAll('[data-progress-step]').forEach((step) => {
+      const stepNumber = Number(step.dataset.progressStep);
+      step.classList.toggle('active', stepNumber === currentStep);
+      step.classList.toggle('complete', stepNumber < currentStep);
+      if (stepNumber === currentStep) step.setAttribute('aria-current', 'step');
+      else step.removeAttribute('aria-current');
+    });
+  }
+
+  function updateShipmentProgress(values) {
+    const receptionComplete = Boolean(
+      values.branchCode && values.destination && values.senderName && values.receiverName
+    );
+    if (!receptionComplete) {
+      setShipmentProgress(1);
+      return;
+    }
+
+    const itemDecision = domain.evaluateItem(values.itemName, values.declaredValue);
+    const itemComplete = Boolean(values.itemName)
+      && itemDecision.outcome !== 'empty'
+      && itemDecision.outcome !== 'blocked'
+      && !(values.itemName.includes('시계') && values.declaredValue === '');
+    if (!itemComplete) {
+      setShipmentProgress(2);
+      return;
+    }
+
+    const measurementsComplete = [values.weight, values.width, values.height, values.depth]
+      .every((value) => domain.positiveNumber(value) !== null);
+    if (!measurementsComplete) {
+      setShipmentProgress(3);
+      return;
+    }
+
+    const calculation = domain.calculate(values);
+    setShipmentProgress(calculation.ok ? 4 : 3);
   }
 
   function setActiveNav(route) {
@@ -837,6 +877,7 @@
     const preview = document.getElementById('calculationPreview');
     if (!preview) return;
     const values = collectForm();
+    updateShipmentProgress(values);
     const result = validateForm(values);
     const submitButton = document.getElementById('submitButton');
     const hasAnyValue = Object.values(values).some(Boolean);
