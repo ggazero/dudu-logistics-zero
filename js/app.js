@@ -267,34 +267,33 @@
 
   function renderHome() {
     app.innerHTML = `
-      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;gap:24px;">
-        <div style="text-align:center;margin-bottom:16px;">
-          <h1 style="font-size:32px;margin:0;color:#172033;">두두 x CU 택배</h1>
-          <p style="font-size:16px;color:#667085;margin:8px 0 0 0;">접수 방식을 선택해주세요</p>
+      <div class="intake-shell">
+        <div class="intake-heading">
+          <p class="eyebrow">CU PARCEL SERVICE</p>
+          <h1>두두 x CU 택배</h1>
+          <p>접수 방식을 선택해주세요</p>
         </div>
-        <div style="display:flex;flex-direction:column;gap:16px;max-width:600px;width:100%;">
-          <a href="/shipments/new?type=reserved" style="padding:32px 24px;border:2px solid #0066cc;border-radius:8px;text-align:center;text-decoration:none;color:white;background:#0066cc;transition:all 0.2s;cursor:pointer;" onmouseover="this.style.backgroundColor='#0052a3'" onmouseout="this.style.backgroundColor='#0066cc'">
-            <div style="font-size:18px;font-weight:600;margin-bottom:8px;">예약택배 접수</div>
-            <div style="font-size:14px;color:rgba(255,255,255,0.9);">사전 예약 접수</div>
+        <div class="intake-options">
+          <a href="/shipments/new?type=reserved" class="intake-option featured">
+            <strong>예약택배 접수</strong>
+            <span>예약번호로 빠르게 접수</span>
           </a>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-            <a href="/shipments/new?type=customer" style="padding:32px 24px;border:2px solid #dfe4ec;border-radius:8px;text-align:center;text-decoration:none;color:#172033;background:white;transition:all 0.2s;cursor:pointer;" onmouseover="this.style.borderColor='#0066cc';this.style.backgroundColor='#f5f9ff'" onmouseout="this.style.borderColor='#dfe4ec';this.style.backgroundColor='white'">
-              <div style="font-size:18px;font-weight:600;margin-bottom:8px;">비회원 택배접수</div>
-              <div style="font-size:14px;color:#667085;">회원 가입 없이 접수</div>
-            </a>
-            <a href="/shipments/new?type=member" style="padding:32px 24px;border:2px solid #dfe4ec;border-radius:8px;text-align:center;text-decoration:none;color:#172033;background:white;transition:all 0.2s;cursor:pointer;" onmouseover="this.style.borderColor='#0066cc';this.style.backgroundColor='#f5f9ff'" onmouseout="this.style.borderColor='#dfe4ec';this.style.backgroundColor='white'">
-              <div style="font-size:18px;font-weight:600;margin-bottom:8px;">회원 택배접수</div>
-              <div style="font-size:14px;color:#667085;">회원 정보로 접수</div>
-            </a>
-            <a href="/shipments/new?type=shopping" style="padding:32px 24px;border:2px solid #dfe4ec;border-radius:8px;text-align:center;text-decoration:none;color:#172033;background:white;transition:all 0.2s;cursor:pointer;" onmouseover="this.style.borderColor='#0066cc';this.style.backgroundColor='#f5f9ff'" onmouseout="this.style.borderColor='#dfe4ec';this.style.backgroundColor='white'">
-              <div style="font-size:18px;font-weight:600;margin-bottom:8px;">쇼핑몰 접수</div>
-              <div style="font-size:14px;color:#667085;">쇼핑몰 연동 접수</div>
-            </a>
-            <a href="/shipments/new?type=branch" style="padding:32px 24px;border:2px solid #dfe4ec;border-radius:8px;text-align:center;text-decoration:none;color:#172033;background:white;transition:all 0.2s;cursor:pointer;" onmouseover="this.style.borderColor='#0066cc';this.style.backgroundColor='#f5f9ff'" onmouseout="this.style.borderColor='#dfe4ec';this.style.backgroundColor='white'">
-              <div style="font-size:18px;font-weight:600;margin-bottom:8px;">점간 택배접수</div>
-              <div style="font-size:14px;color:#667085;">지점 간 접수</div>
-            </a>
-          </div>
+          <a href="/shipments/new?type=customer" class="intake-option">
+            <strong>비회원 택배접수</strong>
+            <span>회원 가입 없이 접수</span>
+          </a>
+          <a href="/shipments/new?type=member" class="intake-option">
+            <strong>회원 택배접수</strong>
+            <span>회원 정보로 접수</span>
+          </a>
+          <a href="/shipments/new?type=shopping" class="intake-option">
+            <strong>쇼핑몰 접수</strong>
+            <span>쇼핑몰 연동 접수</span>
+          </a>
+          <a href="/shipments/new?type=branch" class="intake-option">
+            <strong>점간 택배접수</strong>
+            <span>CU 지점 간 접수</span>
+          </a>
         </div>
       </div>
     `;
@@ -512,7 +511,7 @@
         <article class="card" style="max-width:600px;width:100%;">
           <div style="padding:24px;">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
-              <div><strong>운송장번호</strong><div style="color:#0066cc;margin-top:4px;font-size:18px;font-weight:700;">${escapeHtml(trackingNo)}</div></div>
+              <div><strong>운송장번호</strong><div style="color:var(--blue);margin-top:4px;font-size:18px;font-weight:700;">${escapeHtml(trackingNo)}</div></div>
               <div><strong>예약번호</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${escapeHtml(reservation.reservationNo)}</div></div>
               <div><strong>보내는 분</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${escapeHtml(reservation.senderName)}</div></div>
               <div><strong>받는 분</strong><div style="color:#667085;margin-top:4px;font-size:18px;">${escapeHtml(receiverName)}</div></div>
@@ -667,7 +666,7 @@
         <article class="card" style="max-width:600px;width:100%;">
           <div style="padding:24px;border-bottom:1px solid #dfe4ec;">
             <div style="font-size:13px;color:#667085;margin-bottom:16px;">📱 카카오톡 메시지 내용</div>
-            <div style="background:#f5f5f5;padding:16px;border-radius:8px;border-left:4px solid #0066cc;">
+            <div style="background:#f6eef9;padding:16px;border-radius:8px;border-left:4px solid var(--blue);">
               <div style="font-weight:600;margin-bottom:8px;">두두 x CU 택배 접수 완료</div>
               <div style="font-size:14px;line-height:1.6;color:#333;">
                 <div>📦 운송장번호: ${escapeHtml(shipment.trackingNo)}</div>
