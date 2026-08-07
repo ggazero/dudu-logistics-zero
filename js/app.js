@@ -666,33 +666,50 @@
       </div>`;
 
     const form = document.getElementById('shipmentForm');
+    if (!form) {
+      console.error('Form not found');
+      return;
+    }
+
     form.addEventListener('input', updatePreview);
     form.addEventListener('change', updatePreview);
     form.addEventListener('reset', () => setTimeout(updatePreview));
     form.addEventListener('submit', submitShipment);
 
     // Auto-focus next field on tab/enter
-    const formInputs = form.querySelectorAll('input, select, textarea');
-    formInputs.forEach((input, index) => {
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === 'Tab') {
-          e.preventDefault();
-          const next = formInputs[index + 1];
-          if (next) next.focus();
-        }
+    setTimeout(() => {
+      const formInputs = Array.from(form.querySelectorAll('input, select, textarea'));
+      if (formInputs.length === 0) {
+        console.warn('No form inputs found');
+        return;
+      }
+
+      formInputs.forEach((input, index) => {
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === 'Tab') {
+            e.preventDefault();
+            const next = formInputs[index + 1];
+            if (next) {
+              next.focus();
+              next.select?.();
+            }
+          }
+        });
       });
-    });
+    }, 100);
 
     // Auto-scroll to next section when current section is complete
     const checkSectionComplete = () => {
       const section1Fields = ['branchCode', 'destination', 'senderName', 'receiverName', 'itemName', 'declaredValue'];
-      const section1Complete = section1Fields.every(id => document.getElementById(id)?.value);
+      const section1Complete = section1Fields.every(id => {
+        const el = document.getElementById(id);
+        return el && el.value;
+      });
 
       if (section1Complete) {
-        const section2 = document.querySelector('[style*="section-title"]');
-        if (section2) {
-          const sections = document.querySelectorAll('.form-section');
-          if (sections.length > 1) sections[1].scrollIntoView({ behavior: 'smooth' });
+        const sections = document.querySelectorAll('.form-section');
+        if (sections.length > 1) {
+          sections[1].scrollIntoView({ behavior: 'smooth' });
         }
       }
     };
