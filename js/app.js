@@ -181,7 +181,7 @@
           <section class="form-section">
             <div class="section-title"><span>2</span><h2>무게와 크기</h2></div>
             <div class="form-group">
-              <label for="weight">실제 무게 (kg) <span style="color:var(--red);">*</span></label>
+              <label for="weight">실제 무게 (kg) <span class="measurement-note">(저울 자동측정)</span> <span style="color:var(--red);">*</span></label>
               <input type="number" id="weight" placeholder="예: 3" step="0.1" min="0" style="padding:12px;border:1px solid #dfe4ec;border-radius:4px;width:100%;font-size:16px;box-sizing:border-box;">
             </div>
             <div class="form-group">
@@ -708,7 +708,7 @@
                 <small>확실한 금지 품목은 차단하고, 애매한 표현은 운영 확인으로 보냅니다.</small>
               </div>
               <div class="field">
-                <label for="declaredValue">신고 가액 (원)</label>
+                <label for="declaredValue">택배 물품 가격 (원)</label>
                 <input type="number" id="declaredValue" name="declaredValue" min="0" step="1000" placeholder="시계는 필수 확인">
                 <small>50만원 초과 시계 판정에 사용합니다.</small>
               </div>
@@ -719,7 +719,7 @@
             <div class="section-title"><span>3</span><h2>무게와 크기</h2></div>
             <div class="field-grid">
               <div class="field">
-                <label for="weight">실제 무게 (kg) <b class="required">*</b></label>
+                <label for="weight">실제 무게 (kg) <span class="measurement-note">(저울 자동측정)</span> <b class="required">*</b></label>
                 <input type="number" id="weight" name="weight" min="0.01" step="0.01" placeholder="예: 3">
               </div>
               <div class="field full">
@@ -1228,7 +1228,7 @@
             <p>${escapeHtml(shipment.review.reason)}</p>
             <div class="review-meta">
               <div><small>물품 원본</small><strong>${escapeHtml(shipment.raw.itemName)}</strong></div>
-              <div><small>신고 가액</small><strong>${shipment.item.declaredValue === null ? '미입력' : formatWon(shipment.item.declaredValue)}</strong></div>
+              <div><small>택배 물품 가격</small><strong>${shipment.item.declaredValue === null ? '미입력' : formatWon(shipment.item.declaredValue)}</strong></div>
               <div><small>접수 지점</small><strong>${escapeHtml(shipment.branch.name)}</strong></div>
               <div><small>접수 일시</small><strong>${escapeHtml(formatDateTime(shipment.acceptedAt))}</strong></div>
             </div>
