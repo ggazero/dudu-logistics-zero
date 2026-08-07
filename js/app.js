@@ -667,9 +667,9 @@
     const branchOptions = policy.BRANCHES.map((branch) => `<option value="${branch.code}">${escapeHtml(branch.name)} · ${escapeHtml(branch.hub)}</option>`).join('');
     const destinationOptions = policy.DESTINATIONS.map((area) => `<option value="${escapeHtml(area.name)}">${escapeHtml(area.name)} · ${escapeHtml(area.region)}</option>`).join('');
 
-    app.innerHTML = `${pageHead('New shipment', '새 접수', '표준 입력값만 받고 계산값은 직접 수정할 수 없도록 구성했습니다.', '<div class="button-row" style="gap:8px"><a class="button secondary" href="#/admin/policy">정책 보기</a><a class="button primary" href="#/admin">관리자</a></div>')}
+    app.innerHTML = `${pageHead('New shipment', '새 접수', '표준 입력값만 받고 계산값은 직접 수정할 수 없도록 구성했습니다.', '<a class="button secondary" href="#/admin/policy">정책 보기</a>')}
       <div class="notice">현재 버전은 서버가 아닌 이 브라우저의 localStorage에 저장됩니다. 전사 운송장 중복 방지는 DB 연결 단계에서 최종 적용해야 합니다.</div>
-      <div class="form-layout">
+      <div class="form-layout shipment-layout">
         <form id="shipmentForm" class="form-card" novalidate>
           <section class="form-section">
             <div class="section-title"><span>1</span><h2>접수 기본 정보</h2></div>
@@ -741,7 +741,7 @@
         </form>
 
         <aside class="preview-card" aria-live="polite">
-          <div class="preview-head"><span>실시간 정책 판정</span><strong>접수 전 계산 결과</strong></div>
+          <div class="preview-head"><span>택배 도우미</span><strong>접수 전 계산 결과</strong></div>
           <div id="calculationPreview" class="preview-body"></div>
         </aside>
       </div>`;

@@ -246,6 +246,19 @@ h2 { letter-spacing: -0.025em; }
   width: 100%;
   max-width: 600px;
 }
+.form-layout.shipment-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+  align-items: start;
+  justify-content: stretch;
+}
+.form-layout.shipment-layout .form-card {
+  max-width: none;
+}
+.shipment-layout .preview-card {
+  width: 100%;
+  min-width: 0;
+}
 .form-card, .preview-card { border: 1px solid var(--line); border-radius: var(--radius); background: #fff; box-shadow: var(--shadow); }
 .form-card { padding: 26px; }
 .preview-card { position: sticky; top: 94px; overflow: hidden; }
@@ -372,7 +385,7 @@ h2 { letter-spacing: -0.025em; }
   .main-nav { margin-left: auto; overflow-x: auto; }
   .main-nav a { padding: 0 9px; }
   .metric-grid { grid-template-columns: repeat(2, 1fr); }
-  .form-layout, .detail-grid { grid-template-columns: 1fr; }
+  .form-layout.shipment-layout, .detail-grid { grid-template-columns: 1fr; }
   .preview-card { position: static; }
 }
 
